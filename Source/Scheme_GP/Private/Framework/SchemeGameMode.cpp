@@ -60,10 +60,23 @@ void ASchemeGameMode::ShuffleDeck()
 	VirtualGameDeck = TempDeck;
 }
 
-void ASchemeGameMode::DrawCard(APawn* DrawingPawn)
+void ASchemeGameMode::DealInitialCards()
 {
-	if (!DrawingPawn) return;
+	TArray<TObjectPtr<APlayerState>> PlayerStates = GameState->PlayerArray;
+	for (TObjectPtr<APlayerState> PlayerState : PlayerStates)
+	{
+		if (ASchemePlayerState* SchemePlayerState = Cast<ASchemePlayerState>(PlayerState))
+		{
+			DrawCard(SchemePlayerState);
+		}
+	}
+}
+
+void ASchemeGameMode::DrawCard(ASchemePlayerState* PlayerState)
+{
+	if (!PlayerState) return;
 	if (VirtualGameDeck.Num() == 0) return;
 	UCardDataAsset* Card = VirtualGameDeck.Pop();
-	
+
+	PlayerState->AddCardToHand(Card);
 }

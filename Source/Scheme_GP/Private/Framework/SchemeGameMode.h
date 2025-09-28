@@ -24,7 +24,10 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void ShuffleDeck();
 	UFUNCTION(BlueprintCallable)
-	void DrawCard(APawn* DrawingPawn);
+	void DealInitialCards();
+	
+	UFUNCTION(BlueprintCallable)
+	void DrawCard(class ASchemePlayerState* PlayerState);
 	
 
 private:

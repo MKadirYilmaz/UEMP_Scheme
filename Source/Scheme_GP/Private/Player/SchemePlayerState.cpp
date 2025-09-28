@@ -3,6 +3,8 @@
 
 #include "Player/SchemePlayerState.h"
 
+#include "Gameplay/Data/CardDataAsset.h"
+
 void ASchemePlayerState::AddGold(int32 amount)
 {
 	if (amount < 0)
@@ -27,4 +29,9 @@ bool ASchemePlayerState::RemoveGold(int32 amount)
 	OnGoldChanged.Broadcast(this, Gold, -amount);
 	
 	return true;
+}
+
+void ASchemePlayerState::AddCardToHand(UCardDataAsset* NewCard)
+{
+	HoldingCards.Add(NewCard);
 }
