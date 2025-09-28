@@ -2,7 +2,27 @@
 
 
 #include "Player/SchemePlayerController.h"
+
+#include "Framework/SchemeGameMode.h"
 #include "Kismet/KismetMathLibrary.h"
+
+void ASchemePlayerController::RequestGoldIncome(int32 Amount)
+{
+	ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>();
+	if (GameMode)
+	{
+		GameMode->TryProcessGoldIncome(this, Amount);
+	}
+}
+
+void ASchemePlayerController::RequestGoldOutcome(int32 Amount)
+{
+	ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>();
+	if (GameMode)
+	{
+		GameMode->TryProcessGoldOutcome(this, Amount);
+	}
+}
 
 void ASchemePlayerController::HandleClampedRotation(float MouseInputYaw, float MouseInputPitch)
 {

@@ -14,11 +14,16 @@ class ASchemePlayerController : public APlayerController
 {
 	GENERATED_BODY()
 	
-
+public:
+	UFUNCTION(BlueprintCallable, Category = "Gold System")
+	void RequestGoldIncome(int32 Amount);
+	UFUNCTION(BlueprintCallable, Category = "Gold System")
+	void RequestGoldOutcome(int32 Amount);
+	
 private:
 	UFUNCTION(BlueprintCallable)
 	void HandleClampedRotation(float MouseInputYaw, float MouseInputPitch);
-
+	
 private:
 	UPROPERTY(EditDefaultsOnly, Category = "Movement Adjustments")
 	float MaxYawLimit = 45.f;

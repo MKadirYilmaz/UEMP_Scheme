@@ -5,6 +5,7 @@
 
 #include "InteractionComponent.h"
 #include "Camera/CameraComponent.h"
+#include "Player/SchemePlayerController.h"
 
 // Sets default values
 ASchemePlayerPawn::ASchemePlayerPawn()
@@ -23,6 +24,7 @@ void ASchemePlayerPawn::BeginPlay()
 {
 	Super::BeginPlay();
 
+	PlayerController = Cast<ASchemePlayerController>(GetController());
 	CameraComp = GetComponentByClass<UCameraComponent>();
 	InteractionComp->SetLineTraceStartComp(CameraComp);
 	
