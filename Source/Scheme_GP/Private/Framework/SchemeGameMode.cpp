@@ -60,14 +60,17 @@ void ASchemeGameMode::ShuffleDeck()
 	VirtualGameDeck = TempDeck;
 }
 
-void ASchemeGameMode::DealInitialCards()
+void ASchemeGameMode::DealInitialCards(int32 CardsPerPlayer)
 {
 	TArray<TObjectPtr<APlayerState>> PlayerStates = GameState->PlayerArray;
-	for (TObjectPtr<APlayerState> PlayerState : PlayerStates)
+	for (int32 i = 0; i < CardsPerPlayer; i++)
 	{
-		if (ASchemePlayerState* SchemePlayerState = Cast<ASchemePlayerState>(PlayerState))
+		for (TObjectPtr<APlayerState> PlayerState : PlayerStates)
 		{
-			DrawCard(SchemePlayerState);
+			if (ASchemePlayerState* SchemePlayerState = Cast<ASchemePlayerState>(PlayerState))
+			{
+				DrawCard(SchemePlayerState);
+			}
 		}
 	}
 }
