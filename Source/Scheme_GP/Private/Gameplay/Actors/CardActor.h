@@ -13,5 +13,12 @@ UCLASS()
 class ACardActor : public ABaseInteractableActor
 {
 	GENERATED_BODY()
-	
+
+
+protected:
+	UPROPERTY(EditDefaultsOnly, Category = "Card Data")
+	class UCardDataAsset* CardData;
+
+public:
+	FORCEINLINE class UCardDataAsset* GetCardData() const { return CardData; }
 };

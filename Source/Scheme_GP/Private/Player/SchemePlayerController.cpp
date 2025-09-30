@@ -2,10 +2,34 @@
 
 
 #include "Player/SchemePlayerController.h"
+
+#include "InteractionComponent.h"
+#include "Framework/SchemeGameMode.h"
 #include "Kismet/KismetMathLibrary.h"
+
+void ASchemePlayerController::RequestGoldIncome(int32 Amount)
+{
+	ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>();
+	if (GameMode)
+	{
+		GameMode->TryProcessGoldIncome(this, Amount);
+	}
+}
+
+void ASchemePlayerController::RequestGoldOutcome(int32 Amount)
+{
+	ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>();
+	if (GameMode)
+	{
+		GameMode->TryProcessGoldOutcome(this, Amount);
+	}
+}
 
 void ASchemePlayerController::HandleClampedRotation(float MouseInputYaw, float MouseInputPitch)
 {
+	// If the rotation system disabled then go no further
+	if (!bCameraRotationEnabled)
+		return;
 	// Yaw rotation calculation
 	float CurrDelta = MouseInputYaw + YawRotationDelta;
 	// Check if we reached to yaw limit
@@ -45,4 +69,13 @@ void ASchemePlayerController::HandleClampedRotation(float MouseInputYaw, float M
 		AddPitchInput(-NewRotationChange);
 	}
 	
+}
+
+FHitResult ASchemePlayerController::InteractionPrimaryTracer()
+{
+	if (UInteractionComponent* InteractComp = GetPawn()->GetComponentByClass<UInteractionComponent>())
+	{
+		return InteractComp->CheckInteractionLineTrace();
+	}
+	return FHitResult();
 }

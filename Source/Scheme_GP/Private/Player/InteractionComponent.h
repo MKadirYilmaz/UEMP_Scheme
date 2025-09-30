@@ -40,7 +40,6 @@ public:
 	 * @return The result of the line trace. Will contain information about the hit actor and
 	 *         impact point if a valid interactable object is detected.
 	 */
-	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	FHitResult CheckInteractionLineTrace();
 protected:
 

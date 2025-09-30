@@ -31,5 +31,6 @@ protected:
 	class UInteractionComponent* InteractionComp;
 
 	class UCameraComponent* CameraComp;
+	class ASchemePlayerController* PlayerController;
 
 };
