@@ -13,31 +13,29 @@ UCLASS()
 class ASchemePlayerController : public APlayerController
 {
 	GENERATED_BODY()
+public:
+	ASchemePlayerController();
+	
+protected:
+	virtual void BeginPlay() override;
 	
 public:
-	UFUNCTION(BlueprintCallable, Category = "Gold System")
-	void RequestGoldIncome(int32 Amount);
-	UFUNCTION(BlueprintCallable, Category = "Gold System")
-	void RequestGoldOutcome(int32 Amount);
+	// Called on a client, runs on the server
+	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "Gold System")
+	void SendGoldIncomeRequestToServer(int32 Amount);
+	// Called on a client, runs on the server
+	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "Gold System")
+	void SendGoldOutcomeRequestToServer(int32 Amount);
 	
+	// Called in clients, works in server
+	UFUNCTION(Server, Reliable, Category = "Interaction")
+	void ServerRequestInteract(AActor* InteractActor, APawn* Interactor);
+
+	UFUNCTION(Client, Reliable, Category = "Interaction")
+	void ClientInteractNotify(AActor* InteractActor, APawn* Interactor);
 private:
 	UFUNCTION(BlueprintCallable)
 	void HandleClampedRotation(float MouseInputYaw, float MouseInputPitch);
-
-	/**
-	 * Executes a primary interaction line trace to detect interactable objects.
-	 *
-	 * This method is responsible for invoking the interaction line trace functionality
-	 * provided by the pawn's UInteractionComponent. It retrieves the UInteractionComponent
-	 * from the player's pawn and calls its CheckInteractionLineTrace method to perform
-	 * the trace. If the UInteractionComponent is not found or no interaction is detected,
-	 * an empty FHitResult is returned.
-	 *
-	 * @return The result of the interaction line trace. Contains details about the hit,
-	 *         such as the hit actor and location, if a trace successfully hits an interactable object.
-	 */
-	UFUNCTION(BlueprintCallable)
-	FHitResult InteractionPrimaryTracer();
 	
 private:
 	UPROPERTY(EditDefaultsOnly, Category = "Movement Adjustments")

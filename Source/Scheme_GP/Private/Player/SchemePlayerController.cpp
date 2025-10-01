@@ -5,24 +5,67 @@
 
 #include "InteractionComponent.h"
 #include "Framework/SchemeGameMode.h"
+#include "Interface/InteractableInterface.h"
 #include "Kismet/KismetMathLibrary.h"
 
-void ASchemePlayerController::RequestGoldIncome(int32 Amount)
+ASchemePlayerController::ASchemePlayerController()
 {
-	ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>();
-	if (GameMode)
+	bReplicates = true;
+}
+
+void ASchemePlayerController::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (IsLocalController())
+	{
+		if (HasAuthority())
+		{
+			UE_LOG(LogTemp, Display, TEXT("(CLIENT-SERVER) This player (%s) is both server and client"), *GetName());
+		}
+		else
+		{
+			UE_LOG(LogTemp, Display, TEXT("(CLIENT) This player (%s) is client only"), *GetName());
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Display, TEXT("(REMOTE) Other player's controller %s"), *GetName());
+	}
+}
+
+void ASchemePlayerController::SendGoldOutcomeRequestToServer_Implementation(int32 Amount)
+{
+	if (ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>())
+	{
+		GameMode->TryProcessGoldOutcome(this, Amount);
+	}
+}
+
+void ASchemePlayerController::SendGoldIncomeRequestToServer_Implementation(int32 Amount)
+{
+	if (ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>())
 	{
 		GameMode->TryProcessGoldIncome(this, Amount);
 	}
 }
 
-void ASchemePlayerController::RequestGoldOutcome(int32 Amount)
+void ASchemePlayerController::ServerRequestInteract_Implementation(AActor* InteractActor, APawn* Interactor)
 {
-	ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>();
-	if (GameMode)
+	if (!HasAuthority()) // NO NEED! But double check.
 	{
-		GameMode->TryProcessGoldOutcome(this, Amount);
+		UE_LOG(LogTemp, Error, TEXT("CLIENT: Only the server can interact!"));
+		return;
 	}
+	UE_LOG(LogTemp, Display, TEXT("SERVER: Interact Requested By %s"), *Interactor->GetName());
+
+	IInteractableInterface::Execute_OnInteract(InteractActor, Interactor);
+	//ClientInteractNotify(InteractActor, Interactor);
+}
+
+void ASchemePlayerController::ClientInteractNotify_Implementation(AActor* InteractActor, APawn* Interactor)
+{
+	IInteractableInterface::Execute_OnInteractionSuccessInClient(InteractActor, Interactor);
 }
 
 void ASchemePlayerController::HandleClampedRotation(float MouseInputYaw, float MouseInputPitch)
@@ -71,11 +114,3 @@ void ASchemePlayerController::HandleClampedRotation(float MouseInputYaw, float M
 	
 }
 
-FHitResult ASchemePlayerController::InteractionPrimaryTracer()
-{
-	if (UInteractionComponent* InteractComp = GetPawn()->GetComponentByClass<UInteractionComponent>())
-	{
-		return InteractComp->CheckInteractionLineTrace();
-	}
-	return FHitResult();
-}

@@ -3,6 +3,7 @@
 
 #include "Player/InteractionComponent.h"
 
+#include "SchemePlayerController.h"
 #include "Interface/InteractableInterface.h"
 
 // Sets default values for this component's properties
@@ -42,7 +43,6 @@ void UInteractionComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 
 		if (HitResult.GetActor()->GetClass()->ImplementsInterface(UInteractableInterface::StaticClass()))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Inspecting on: %s"), *HitResult.GetActor()->GetName());
 			// Check if we are looking at another actor
 			if (HoveredActor != HitResult.GetActor())
 			{
@@ -68,27 +68,21 @@ void UInteractionComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 	}
 }
 
-FHitResult UInteractionComponent::CheckInteractionLineTrace()
+void UInteractionComponent::TryPrimaryInteract()
 {
-	if (LineTraceStartComp == nullptr)
-		return FHitResult();
-	
-	FHitResult HitResult;
-	FVector Start = LineTraceStartComp->GetComponentLocation();
-	FVector End = Start + LineTraceStartComp->GetForwardVector() * MaxInteractionDistance;
-	if (GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, LineTraceChannel))
+	if (!LineTraceStartComp || !OwnerPawn)
+		return;
+	if (!HoveredActor)
 	{
-		if (HitResult.GetActor()->GetClass()->ImplementsInterface(UInteractableInterface::StaticClass()))
-		{
-			IInteractableInterface::Execute_OnInteract(HitResult.GetActor(), OwnerPawn);
-			return HitResult;
-		}
-		else
-		{
-			return FHitResult();
-		}
+		UE_LOG(LogTemp, Display, TEXT("No Actor Hovered!"));
+		return;
 	}
-	return HitResult;
+	if (ASchemePlayerController* PlayerController = Cast<ASchemePlayerController>(OwnerPawn->GetController()))
+	{
+		PlayerController->ServerRequestInteract(HoveredActor, OwnerPawn);
+		UE_LOG(LogTemp, Display, TEXT("Primary Interact Server Permission Requested By %s"), *OwnerPawn->GetName());
+		IInteractableInterface::Execute_OnInteractionSuccessInClient(HoveredActor, OwnerPawn);
+	}
 }
 
 

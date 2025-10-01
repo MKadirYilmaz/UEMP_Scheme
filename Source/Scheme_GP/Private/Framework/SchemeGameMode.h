@@ -14,10 +14,20 @@ class ASchemeGameMode : public AGameModeBase
 {
 	GENERATED_BODY()
 
+protected:
+
+	virtual void BeginPlay() override;
+	// Called when a new player joins (Only on server)
+	virtual void PostLogin(APlayerController* NewPlayer) override;
+	// Called when a player leaves (Only on server)
+	virtual void Logout(AController* Exiting) override;
+	
 public:
 	
-	bool TryProcessGoldIncome(APlayerController* RequestingController, int32 Amount);
-	bool TryProcessGoldOutcome(APlayerController* RequestingController, int32 Amount);
+	UFUNCTION(Server, Reliable, Category = "Gold System")
+	void TryProcessGoldIncome(APlayerController* RequestingController, int32 Amount);
+	UFUNCTION(Server, Reliable, Category = "Gold System")
+	void TryProcessGoldOutcome(APlayerController* RequestingController, int32 Amount);
 
 	/**
 	 * Creates a virtual deck of cards based on the number of players in the game.

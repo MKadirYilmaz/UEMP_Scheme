@@ -24,23 +24,9 @@ public:
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
-	/**
-	 * Performs a line trace in the world to detect interactable objects.
-	 *
-	 * This function casts a line trace starting from the location of the LineTraceStartComp
-	 * component in the direction of its forward vector, up to a maximum distance defined
-	 * by MaxInteractionDistance. The line trace uses the collision channel specified
-	 * in LineTraceChannel.
-	 *
-	 * If the trace hits an actor that implements the UInteractableInterface, the OnInteract
-	 * function of the interface is executed with the player controller as a parameter.
-	 * Returns the hit result of the line trace. If no valid interactable target is hit,
-	 * an empty FHitResult is returned.
-	 *
-	 * @return The result of the line trace. Will contain information about the hit actor and
-	 *         impact point if a valid interactable object is detected.
-	 */
-	FHitResult CheckInteractionLineTrace();
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	void TryPrimaryInteract();
+
 protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Adjustments")

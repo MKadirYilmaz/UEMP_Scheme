@@ -8,25 +8,56 @@
 #include "Player/SchemePlayerState.h"
 
 
-bool ASchemeGameMode::TryProcessGoldIncome(APlayerController* RequestingController, int32 Amount)
+void ASchemeGameMode::BeginPlay()
 {
-	if (!RequestingController) return false;
+	Super::BeginPlay();
 
-	ASchemePlayerState* PlayerState = RequestingController->GetPlayerState<ASchemePlayerState>();
-	if (!PlayerState) return false;
-
-	PlayerState->AddGold(Amount);
-	return true;
+	UE_LOG(LogTemp, Display, TEXT("This is GameMode! Authority Check: %s"),
+		HasAuthority() ? TEXT("TRUE (Server)") : TEXT("FALSE"));
 }
 
-bool ASchemeGameMode::TryProcessGoldOutcome(APlayerController* RequestingController, int32 Amount)
+void ASchemeGameMode::PostLogin(APlayerController* NewPlayer)
 {
-	if (!RequestingController) return false;
+	Super::PostLogin(NewPlayer);
+
+	if (!NewPlayer)
+		return;
+
+	UE_LOG(LogTemp, Display, TEXT("New Player Has Connected! %s"), *NewPlayer->GetName());
+	if (ASchemePlayerState* PlayerState = NewPlayer->GetPlayerState<ASchemePlayerState>())
+	{
+		UE_LOG(LogTemp, Display, TEXT("		Player State Created! %s"), *PlayerState->GetName());
+	}
+}
+
+void ASchemeGameMode::Logout(AController* Exiting)
+{
+	Super::Logout(Exiting);
+
+	if (!Exiting)
+		return;
+
+	UE_LOG(LogTemp, Display, TEXT("Player Has Left! %s"), *Exiting->GetName());
+}
+
+void ASchemeGameMode::TryProcessGoldIncome_Implementation(APlayerController* RequestingController, int32 Amount)
+{
+	if (!RequestingController) return;
 
 	ASchemePlayerState* PlayerState = RequestingController->GetPlayerState<ASchemePlayerState>();
-	if (!PlayerState) return false;
+	if (!PlayerState) return;
+
+	PlayerState->AddGold(Amount);
+}
+
+void ASchemeGameMode::TryProcessGoldOutcome_Implementation(APlayerController* RequestingController, int32 Amount)
+{
+	if (!RequestingController) return;
+
+	ASchemePlayerState* PlayerState = RequestingController->GetPlayerState<ASchemePlayerState>();
+	if (!PlayerState) return ;
 	
-	return PlayerState->RemoveGold(Amount);
+	PlayerState->RemoveGold(Amount);
 }
 
 void ASchemeGameMode::CreateVirtualDeck(int32 NumOfPlayers)
