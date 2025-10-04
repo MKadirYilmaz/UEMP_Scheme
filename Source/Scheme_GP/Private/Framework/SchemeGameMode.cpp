@@ -73,8 +73,9 @@ AActor* ASchemeGameMode::ChoosePlayerStart_Implementation(AController* Player)
 {
 	if (PlayerStartLocations.Num() > 0)
 	{
-		if (GetNumPlayers() < PlayerStartLocations.Num())
-			return PlayerStartLocations[GetNumPlayers()];
+		APlayerStart* PlayerStart = PlayerStartLocations[0];
+		PlayerStartLocations.RemoveAt(0);
+		return PlayerStart;
 	}
 	
 	return Super::ChoosePlayerStart_Implementation(Player);
