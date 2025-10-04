@@ -3,7 +3,8 @@
 
 #include "Player/SchemePlayerController.h"
 
-#include "InteractionComponent.h"
+#include "SchemePlayerPawn.h"
+#include "Net/UnrealNetwork.h"
 #include "Framework/SchemeGameMode.h"
 #include "Interface/InteractableInterface.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -52,15 +53,10 @@ void ASchemePlayerController::SendGoldIncomeRequestToServer_Implementation(int32
 
 void ASchemePlayerController::ServerRequestInteract_Implementation(AActor* InteractActor, APawn* Interactor)
 {
-	if (!HasAuthority()) // NO NEED! But double check.
-	{
-		UE_LOG(LogTemp, Error, TEXT("CLIENT: Only the server can interact!"));
-		return;
-	}
 	UE_LOG(LogTemp, Display, TEXT("SERVER: Interact Requested By %s"), *Interactor->GetName());
 
 	IInteractableInterface::Execute_OnInteract(InteractActor, Interactor);
-	//ClientInteractNotify(InteractActor, Interactor);
+	ClientInteractNotify(InteractActor, Interactor);
 }
 
 void ASchemePlayerController::ClientInteractNotify_Implementation(AActor* InteractActor, APawn* Interactor)
@@ -73,6 +69,24 @@ void ASchemePlayerController::HandleClampedRotation(float MouseInputYaw, float M
 	// If the rotation system disabled then go no further
 	if (!bCameraRotationEnabled)
 		return;
+
+	if (!CameraRootComp)
+	{
+		if (ASchemePlayerPawn* PlayerPawn = Cast<ASchemePlayerPawn>(GetPawn()))
+		{
+			CameraRootComp = PlayerPawn->GetCameraRootComp();
+			if (!CameraRootComp)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Controller %s: CameraRootComp still NULL, waiting..."), *GetName());
+				return;
+			}
+		}
+		else
+		{
+			return;
+		}
+	}
+	float YawRotation, PitchRotation;
 	// Yaw rotation calculation
 	float CurrDelta = MouseInputYaw + YawRotationDelta;
 	// Check if we reached to yaw limit
@@ -81,7 +95,7 @@ void ASchemePlayerController::HandleClampedRotation(float MouseInputYaw, float M
 		// We didn't reach to limit
 		YawRotationDelta = CurrDelta;
 		// Rotate with MouseInputYaw value
-		AddYawInput(MouseInputYaw);
+		YawRotation = MouseInputYaw;
 	}
 	else
 	{
@@ -90,7 +104,7 @@ void ASchemePlayerController::HandleClampedRotation(float MouseInputYaw, float M
 
 		YawRotationDelta += NewRotationChange;
 		// Rotate with NewRotationChange value
-		AddYawInput(NewRotationChange);
+		YawRotation = NewRotationChange;
 	}
 	// Pitch rotation calculation
 	CurrDelta = MouseInputPitch + PitchRotationDelta;
@@ -100,7 +114,7 @@ void ASchemePlayerController::HandleClampedRotation(float MouseInputYaw, float M
 		// We didn't reach to limit
 		PitchRotationDelta = CurrDelta;
 		// Rotate with MouseInputPitch value
-		AddPitchInput(-MouseInputPitch);
+		PitchRotation = MouseInputPitch;
 	}
 	else
 	{
@@ -109,8 +123,39 @@ void ASchemePlayerController::HandleClampedRotation(float MouseInputYaw, float M
 
 		PitchRotationDelta += NewRotationChange;
 		// Rotate with NewRotationChange value
-		AddPitchInput(-NewRotationChange);
+		PitchRotation = NewRotationChange;
 	}
+	CameraRootComp->AddLocalRotation(FRotator(PitchRotation, YawRotation, 0));
+	FRotator CurrentRotation = CameraRootComp->GetRelativeRotation();
+	HandleRotationInServer(CurrentRotation.Yaw, CurrentRotation.Pitch);
+}
+
+void ASchemePlayerController::HandleRotationInServer_Implementation(float Yaw, float Pitch)
+{
+	// Runs in the server
+	ASchemePlayerPawn* PlayerPawn = Cast<ASchemePlayerPawn>(GetPawn());
+	if (!PlayerPawn)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Controller %s: GetPawn() is NULL!"), *GetName());
+		return;
+	}
+
+	USceneComponent* CameraRoot = PlayerPawn->GetCameraRootComp();
+	if (!CameraRoot)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Controller %s: CameraRoot is NULL in Pawn %s!"), 
+			*GetName(), *PlayerPawn->GetName());
+		return;
+	}
+
+	// Apply rotation on the server
+	FRotator NewRotation = FRotator(Pitch, Yaw, 0);
+	CameraRoot->SetRelativeRotation(NewRotation);
 	
+	// Update the replicated variable (send to other clients)
+	PlayerPawn->CameraRotation = NewRotation;
+	
+	UE_LOG(LogTemp, Display, TEXT("SERVER: Rotation updated for %s to %s"), 
+		*PlayerPawn->GetName(), *NewRotation.ToString());
 }
 

@@ -5,6 +5,7 @@
 
 #include "InteractionComponent.h"
 #include "Camera/CameraComponent.h"
+#include "Net/UnrealNetwork.h"
 #include "Player/SchemePlayerController.h"
 
 // Sets default values
@@ -26,7 +27,37 @@ void ASchemePlayerPawn::BeginPlay()
 
 	PlayerController = Cast<ASchemePlayerController>(GetController());
 	CameraComp = GetComponentByClass<UCameraComponent>();
-	InteractionComp->SetLineTraceStartComp(CameraComp);
+	
+	if (CameraComp)
+	{
+		CameraRootComp = CameraComp->GetAttachParent();
+		
+		if (IsLocallyControlled())
+		{
+			if (UStaticMeshComponent* HeadMesh = Cast<UStaticMeshComponent>(CameraRootComp))
+			{
+				HeadMesh->SetOwnerNoSee(true);
+			}
+			
+			if (InteractionComp)
+			{
+				InteractionComp->SetLineTraceStartComp(CameraComp);
+			}
+		}
+		
+		
+		if (PlayerController)
+		{
+			PlayerController->SetCameraRootComponent(CameraRootComp);
+		}
+		
+		UE_LOG(LogTemp, Display, TEXT("Pawn %s: CameraRootComp INITIALIZED (IsLocal: %s)"), 
+			*GetName(), IsLocallyControlled() ? TEXT("YES") : TEXT("NO"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("Pawn %s: CameraComp is NULL!"), *GetName());
+	}
 	
 }
 
@@ -42,5 +73,23 @@ void ASchemePlayerPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
+}
+
+void ASchemePlayerPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(ASchemePlayerPawn, CameraRotation);
+}
+
+void ASchemePlayerPawn::OnRep_CameraRotation()
+{
+	// Remote client
+	if (CameraRootComp && !IsLocallyControlled())
+	{
+		CameraRootComp->SetRelativeRotation(CameraRotation);
+		UE_LOG(LogTemp, Display, TEXT("REMOTE Pawn %s: Rotation Updated to %s"), 
+			*GetName(), *CameraRotation.ToString());
+	}
 }
 

@@ -29,15 +29,23 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Gold")
 	FORCEINLINE int32 GetGold() const { return Gold; }
 
+	
 	UFUNCTION(BlueprintImplementableEvent, Category = "Gold")
 	void OnGoldChange(int32 NewGold, int32 Delta);
+	UFUNCTION(BlueprintImplementableEvent, Category = "Card")
+	void OnCardChange(const TArray<class UCardDataAsset*>& NewCards);
 private:
 	UPROPERTY(ReplicatedUsing = OnRep_Gold, VisibleAnywhere, Category = "Gold")
 	int32 Gold = 0;
-	UPROPERTY(VisibleAnywhere, Category = "Card")
+	UPROPERTY(ReplicatedUsing = OnRep_HoldingCards, VisibleAnywhere, Category = "Card")
 	TArray<class UCardDataAsset*> HoldingCards;
 
+	int32 CachedDelta = 0;
+	
 	// Called only on clients when the value has changed
 	UFUNCTION()
 	void OnRep_Gold();
+	// Called only on clients when the value has changed
+	UFUNCTION()
+	void OnRep_HoldingCards();
 };

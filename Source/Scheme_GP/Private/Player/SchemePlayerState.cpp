@@ -16,6 +16,7 @@ void ASchemePlayerState::GetLifetimeReplicatedProps(TArray<class FLifetimeProper
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(ASchemePlayerState, Gold);
+	DOREPLIFETIME(ASchemePlayerState, HoldingCards);
 }
 
 void ASchemePlayerState::AddGold(int32 amount)
@@ -30,6 +31,7 @@ void ASchemePlayerState::AddGold(int32 amount)
 		UE_LOG(LogTemp, Error, TEXT("Negative gold amount is not allowed"));
 		return;
 	}
+	CachedDelta = amount;
 	Gold += amount;
 	UE_LOG(LogTemp, Display, TEXT("SERVER: New Gold: %d"), Gold);
 
@@ -54,8 +56,8 @@ bool ASchemePlayerState::RemoveGold(int32 amount)
 		UE_LOG(LogTemp, Error, TEXT("SERVER: Not enough gold to remove"));
 		return false;
 	}
+	CachedDelta = -amount;
 	Gold -= amount;
-
 	UE_LOG(LogTemp, Display, TEXT("SERVER: New Gold: %d"), Gold);
 
 	OnGoldChange(Gold, -amount);
@@ -71,5 +73,13 @@ void ASchemePlayerState::OnRep_Gold()
 {
 	// Called automatically in clients when the gold value has changed.
 
-	
+	OnGoldChange(Gold, CachedDelta);
+}
+
+void ASchemePlayerState::OnRep_HoldingCards()
+{
+	// Called automatically in clients when the holding cards have changed.
+
+	OnCardChange(HoldingCards);
+	UE_LOG(LogTemp, Display, TEXT("Holding Cards Have Changed In: %s"), *GetName());
 }

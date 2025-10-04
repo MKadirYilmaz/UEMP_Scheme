@@ -17,37 +17,22 @@ class ASchemeGameMode : public AGameModeBase
 protected:
 
 	virtual void BeginPlay() override;
+	
+public:
 	// Called when a new player joins (Only on server)
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	// Called when a player leaves (Only on server)
 	virtual void Logout(AController* Exiting) override;
-	
-public:
 	
 	UFUNCTION(Server, Reliable, Category = "Gold System")
 	void TryProcessGoldIncome(APlayerController* RequestingController, int32 Amount);
 	UFUNCTION(Server, Reliable, Category = "Gold System")
 	void TryProcessGoldOutcome(APlayerController* RequestingController, int32 Amount);
 
-	/**
-	 * Creates a virtual deck of cards based on the number of players in the game.
-	 *
-	 * This method initializes and populates the VirtualGameDeck array by adding multiple
-	 * copies of each card from the AllCardDataTypes collection. The number of copies per
-	 * card is determined by the number of players. For up to 7 players, 3 copies per card
-	 * are added, and for more than 7 players, 4 copies per card are added.
-	 *
-	 * Note:
-	 * - Ensure that GameState and AllCardDataTypes are properly initialized before calling this method.
-	 * - The VirtualGameDeck array will be emptied before being populated.
-	 * - If GameState is invalid, the method will exit without modifying the deck.
-	 *
-	 * @param NumOfPlayers The number of players participating in the game, which impacts
-	 * the number of copies added per card. If not provided explicitly, it will be updated
-	 * based on the current count of players in GameState's PlayerArray.
-	 */
+	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
+	
 	UFUNCTION(BlueprintCallable)
-	void CreateVirtualDeck(int32 NumOfPlayers);
+	void CreateVirtualDeck();
 	
 	/**
 	 * Randomizes the order of the cards in the virtual deck.
@@ -86,10 +71,36 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void DrawCard(class ASchemePlayerState* PlayerState);
 	
+	UFUNCTION(BlueprintCallable)
+	void StartSchemeGame();
 
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnCanGameStartValid();
+private:
+
+	void FindAllStartLocations();
 private:
 	UPROPERTY(EditDefaultsOnly, Category = "Card System")
 	TArray<class UCardDataAsset*> AllCardDataTypes;
 	UPROPERTY(VisibleAnywhere, Category = "Card System")
 	TArray<class UCardDataAsset*> VirtualGameDeck;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Gameplay Adjustments")
+	int32 MinPlayer = 2;
+	UPROPERTY(EditDefaultsOnly, Category = "Gameplay Adjustments")
+	int32 MaxPlayer = 8;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Gameplay Adjustments")
+	int32 CardAmountPerPlayer = 2;
+	
+	TArray<APlayerController*> CurrentPlayers;
+	TArray<class APlayerStart*> PlayerStartLocations;
+
+	bool bCanGameStart = false;
+	bool bIsGameStarted = false;
+
+public:
+	UFUNCTION(BlueprintCallable)
+	FORCEINLINE bool GetCanGameStart() const { return bCanGameStart; }
+	
 };
