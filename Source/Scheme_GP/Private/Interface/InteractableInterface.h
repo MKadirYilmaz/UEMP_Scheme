@@ -22,7 +22,7 @@ class IInteractableInterface
 
 public:
 	/**
-	 * Handles the logic when an actor gains focus from an interactor.
+	 * Handles the logic when an actor gains focus from an interactor. Works on a client.
 	 *
 	 * @param Interactor The pawn that focuses on the actor.
 	 */
@@ -31,7 +31,7 @@ public:
 
 
 	/**
-	 * Handles the logic when an actor loses focus from an interactor.
+	 * Handles the logic when an actor loses focus from an interactor. Works on a client.
 	 *
 	 * @param Interactor The pawn that has lost focus on the actor.
 	 */
@@ -40,12 +40,15 @@ public:
 
 
 	/**
-	 * Handles the interaction logic when an interactor interacts with the actor.
+	 * Handles the interaction logic when an interactor interacts with the actor. Works only on the server
 	 *
 	 * @param Interactor The pawn that initiates the interaction with the actor.
 	 */
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction")
 	void OnInteract(APawn* Interactor);
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction")
+	void OnInteractionSuccessInClient(APawn* Interactor);
 	
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:

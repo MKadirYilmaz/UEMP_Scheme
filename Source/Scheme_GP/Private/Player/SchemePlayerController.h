@@ -13,31 +13,62 @@ UCLASS()
 class ASchemePlayerController : public APlayerController
 {
 	GENERATED_BODY()
+public:
+	ASchemePlayerController();
+	
+protected:
+	virtual void BeginPlay() override;
 	
 public:
-	UFUNCTION(BlueprintCallable, Category = "Gold System")
-	void RequestGoldIncome(int32 Amount);
-	UFUNCTION(BlueprintCallable, Category = "Gold System")
-	void RequestGoldOutcome(int32 Amount);
+	// Called on a client, runs on the server
+	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "Gold System")
+	void SendGoldIncomeRequestToServer(int32 Amount);
+	// Called on a client, runs on the server
+	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "Gold System")
+	void SendGoldOutcomeRequestToServer(int32 Amount);
 	
-private:
-	UFUNCTION(BlueprintCallable)
-	void HandleClampedRotation(float MouseInputYaw, float MouseInputPitch);
+	// Called in clients, works in server
+	UFUNCTION(Server, Reliable, Category = "Interaction")
+	void ServerRequestInteract(AActor* InteractActor, APawn* Interactor);
 
+	UFUNCTION(Client, Reliable, Category = "Interaction")
+	void ClientInteractNotify(AActor* InteractActor, APawn* Interactor);
+private:
 	/**
-	 * Executes a primary interaction line trace to detect interactable objects.
+	 * Handles camera rotation based on mouse input while enforcing yaw and pitch rotation limits.
 	 *
-	 * This method is responsible for invoking the interaction line trace functionality
-	 * provided by the pawn's UInteractionComponent. It retrieves the UInteractionComponent
-	 * from the player's pawn and calls its CheckInteractionLineTrace method to perform
-	 * the trace. If the UInteractionComponent is not found or no interaction is detected,
-	 * an empty FHitResult is returned.
+	 * This function processes rotation inputs (yaw and pitch) from the user and applies them
+	 * to the camera's local rotation. It ensures that the rotations are clamped within the defined
+	 * maximum yaw and pitch limits (`MaxYawLimit` and `MaxPitchLimit` respectively). The function
+	 * adjusts the rotation incrementally based on the input while preventing the camera from
+	 * exceeding the allowed range.
 	 *
-	 * @return The result of the interaction line trace. Contains details about the hit,
-	 *         such as the hit actor and location, if a trace successfully hits an interactable object.
+	 * If the camera rotation system (`bCameraRotationEnabled`) is disabled, or if the camera's
+	 * root component is not initialized, the function exits without performing any operations.
+	 *
+	 * Once the rotation is updated, it propagates the current yaw and pitch values to the server
+	 * using the `HandleRotationInServer` method for synchronization in multiplayer scenarios.
+	 *
+	 * @param MouseInputYaw The input delta value for yaw rotation, typically derived from horizontal mouse movement.
+	 * @param MouseInputPitch The input delta value for pitch rotation, typically derived from vertical mouse movement.
 	 */
 	UFUNCTION(BlueprintCallable)
-	FHitResult InteractionPrimaryTracer();
+	void HandleClampedRotation(float MouseInputYaw, float MouseInputPitch);
+	/**
+	 * Synchronizes the camera's yaw and pitch rotation values with the server.
+	 *
+	 * This function is called on the client-side to transmit the current yaw and pitch values
+	 * to the server for synchronization. It ensures that the camera's rotation state remains
+	 * consistent across the server and all connected clients in multiplayer scenarios.
+	 *
+	 * This function is marked as unreliable, indicating that the updates may be sent less frequently,
+	 * which is appropriate for scenarios where precision is less critical and performance is a priority.
+	 *
+	 * @param Yaw The current yaw rotation value of the camera to be synchronized with the server.
+	 * @param Pitch The current pitch rotation value of the camera to be synchronized with the server.
+	 */
+	UFUNCTION(Server, Unreliable)
+	void HandleRotationInServer(float Yaw, float Pitch);
 	
 private:
 	UPROPERTY(EditDefaultsOnly, Category = "Movement Adjustments")
@@ -45,6 +76,8 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Movement Adjustments")
 	float MaxPitchLimit = 30.f;
 
+	USceneComponent* CameraRootComp;
+	
 	float YawRotationDelta;
 	float PitchRotationDelta;
 
@@ -71,4 +104,6 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Camera Rotation System")
 	FORCEINLINE void SetCameraRotationEnabled(bool bEnabled) {bCameraRotationEnabled = bEnabled;}
+
+	FORCEINLINE void SetCameraRootComponent(USceneComponent* NewCameraRoot) { CameraRootComp = NewCameraRoot; }
 };

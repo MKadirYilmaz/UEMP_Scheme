@@ -6,7 +6,6 @@
 #include "GameFramework/PlayerState.h"
 #include "SchemePlayerState.generated.h"
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnGoldChanged, ASchemePlayerState*, PlayerState, int32, NewGold, int32, Delta);
 /**
  * 
  */
@@ -16,6 +15,10 @@ class ASchemePlayerState : public APlayerState
 	GENERATED_BODY()
 
 public:
+	ASchemePlayerState();
+
+	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+	
 	// Do not call this function other than GameMode class
 	void AddGold(int32 amount);
 	// Do not call this function other than GameMode class
@@ -26,14 +29,23 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Gold")
 	FORCEINLINE int32 GetGold() const { return Gold; }
 
-	UPROPERTY(BlueprintAssignable, Category = "Gold")
-	FOnGoldChanged OnGoldChanged;
-
+	
+	UFUNCTION(BlueprintImplementableEvent, Category = "Gold")
+	void OnGoldChange(int32 NewGold, int32 Delta);
+	UFUNCTION(BlueprintImplementableEvent, Category = "Card")
+	void OnCardChange(const TArray<class UCardDataAsset*>& NewCards);
 private:
-	UPROPERTY(VisibleAnywhere, Category = "Gold")
+	UPROPERTY(ReplicatedUsing = OnRep_Gold, VisibleAnywhere, Category = "Gold")
 	int32 Gold = 0;
-	UPROPERTY(VisibleAnywhere, Category = "Card")
+	UPROPERTY(ReplicatedUsing = OnRep_HoldingCards, VisibleAnywhere, Category = "Card")
 	TArray<class UCardDataAsset*> HoldingCards;
+
+	int32 CachedDelta = 0;
 	
-	
+	// Called only on clients when the value has changed
+	UFUNCTION()
+	void OnRep_Gold();
+	// Called only on clients when the value has changed
+	UFUNCTION()
+	void OnRep_HoldingCards();
 };

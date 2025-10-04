@@ -3,6 +3,7 @@
 
 #include "Player/InteractionComponent.h"
 
+#include "SchemePlayerController.h"
 #include "Interface/InteractableInterface.h"
 
 // Sets default values for this component's properties
@@ -30,7 +31,7 @@ void UInteractionComponent::BeginPlay()
 void UInteractionComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-	if (LineTraceStartComp == nullptr)
+	if (LineTraceStartComp == nullptr || !OwnerPawn->IsLocallyControlled())
 		return;
 	
 	FHitResult HitResult;
@@ -42,18 +43,22 @@ void UInteractionComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 
 		if (HitResult.GetActor()->GetClass()->ImplementsInterface(UInteractableInterface::StaticClass()))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Inspecting on: %s"), *HitResult.GetActor()->GetName());
 			// Check if we are looking at another actor
 			if (HoveredActor != HitResult.GetActor())
 			{
-				IInteractableInterface::Execute_OnBeginFocus(HitResult.GetActor(), OwnerPawn);
 				if (HoveredActor)
+				{
+					UE_LOG(LogTemp, Display, TEXT("End Hovered Actor: %s"), *HoveredActor->GetName());
 					IInteractableInterface::Execute_OnEndFocus(HoveredActor, OwnerPawn);
+				}
+				UE_LOG(LogTemp, Display, TEXT("Start Hovered Actor: %s"), *HitResult.GetActor()->GetName());
+				IInteractableInterface::Execute_OnBeginFocus(HitResult.GetActor(), OwnerPawn);
 			}
 			HoveredActor = HitResult.GetActor();
 		}
 		else if (HoveredActor)
 		{
+			UE_LOG(LogTemp, Display, TEXT("End Hovered Actor: %s"), *HoveredActor->GetName());
 			IInteractableInterface::Execute_OnEndFocus(HoveredActor, OwnerPawn);
 			HoveredActor = nullptr;
 		}
@@ -63,32 +68,31 @@ void UInteractionComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 		if (bDrawLineTraceLine) DrawDebugLine(GetWorld(), Start, End, FColor::Red, false, 0.f, 0, 0.5f);
 		if (!HoveredActor)
 			return;
+		UE_LOG(LogTemp, Display, TEXT("End Hovered Actor"));
 		IInteractableInterface::Execute_OnEndFocus(HoveredActor, OwnerPawn);
 		HoveredActor = nullptr;
 	}
 }
 
-FHitResult UInteractionComponent::CheckInteractionLineTrace()
+void UInteractionComponent::TryPrimaryInteract()
 {
-	if (LineTraceStartComp == nullptr)
-		return FHitResult();
-	
-	FHitResult HitResult;
-	FVector Start = LineTraceStartComp->GetComponentLocation();
-	FVector End = Start + LineTraceStartComp->GetForwardVector() * MaxInteractionDistance;
-	if (GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, LineTraceChannel))
+	if (!LineTraceStartComp || !OwnerPawn)
+		return;
+	if (!OwnerPawn->IsLocallyControlled())
 	{
-		if (HitResult.GetActor()->GetClass()->ImplementsInterface(UInteractableInterface::StaticClass()))
-		{
-			IInteractableInterface::Execute_OnInteract(HitResult.GetActor(), OwnerPawn);
-			return HitResult;
-		}
-		else
-		{
-			return FHitResult();
-		}
+		UE_LOG(LogTemp, Warning, TEXT("Only the local player can interact!"));
+		return;
 	}
-	return HitResult;
+	if (!HoveredActor)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("No Actor Hovered!"));
+		return;
+	}
+	if (ASchemePlayerController* PlayerController = Cast<ASchemePlayerController>(OwnerPawn->GetController()))
+	{
+		PlayerController->ServerRequestInteract(HoveredActor, OwnerPawn);
+		UE_LOG(LogTemp, Display, TEXT("Primary Interact Server Permission Requested By %s"), *OwnerPawn->GetName());
+	}
 }
 
 

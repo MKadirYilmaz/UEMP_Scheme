@@ -3,26 +3,65 @@
 
 #include "Player/SchemePlayerController.h"
 
-#include "InteractionComponent.h"
+#include "SchemePlayerPawn.h"
+#include "Net/UnrealNetwork.h"
 #include "Framework/SchemeGameMode.h"
+#include "Interface/InteractableInterface.h"
 #include "Kismet/KismetMathLibrary.h"
 
-void ASchemePlayerController::RequestGoldIncome(int32 Amount)
+ASchemePlayerController::ASchemePlayerController()
 {
-	ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>();
-	if (GameMode)
+	bReplicates = true;
+}
+
+void ASchemePlayerController::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (IsLocalController())
+	{
+		if (HasAuthority())
+		{
+			UE_LOG(LogTemp, Display, TEXT("(CLIENT-SERVER) This player (%s) is both server and client"), *GetName());
+		}
+		else
+		{
+			UE_LOG(LogTemp, Display, TEXT("(CLIENT) This player (%s) is client only"), *GetName());
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Display, TEXT("(REMOTE) Other player's controller %s"), *GetName());
+	}
+}
+
+void ASchemePlayerController::SendGoldOutcomeRequestToServer_Implementation(int32 Amount)
+{
+	if (ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>())
+	{
+		GameMode->TryProcessGoldOutcome(this, Amount);
+	}
+}
+
+void ASchemePlayerController::SendGoldIncomeRequestToServer_Implementation(int32 Amount)
+{
+	if (ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>())
 	{
 		GameMode->TryProcessGoldIncome(this, Amount);
 	}
 }
 
-void ASchemePlayerController::RequestGoldOutcome(int32 Amount)
+void ASchemePlayerController::ServerRequestInteract_Implementation(AActor* InteractActor, APawn* Interactor)
 {
-	ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>();
-	if (GameMode)
-	{
-		GameMode->TryProcessGoldOutcome(this, Amount);
-	}
+	UE_LOG(LogTemp, Display, TEXT("SERVER: Interact Requested By %s"), *Interactor->GetName());
+
+	IInteractableInterface::Execute_OnInteract(InteractActor, Interactor);
+	ClientInteractNotify(InteractActor, Interactor);
+}
+
+void ASchemePlayerController::ClientInteractNotify_Implementation(AActor* InteractActor, APawn* Interactor)
+{
+	IInteractableInterface::Execute_OnInteractionSuccessInClient(InteractActor, Interactor);
 }
 
 void ASchemePlayerController::HandleClampedRotation(float MouseInputYaw, float MouseInputPitch)
@@ -30,6 +69,24 @@ void ASchemePlayerController::HandleClampedRotation(float MouseInputYaw, float M
 	// If the rotation system disabled then go no further
 	if (!bCameraRotationEnabled)
 		return;
+
+	if (!CameraRootComp)
+	{
+		if (ASchemePlayerPawn* PlayerPawn = Cast<ASchemePlayerPawn>(GetPawn()))
+		{
+			CameraRootComp = PlayerPawn->GetCameraRootComp();
+			if (!CameraRootComp)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Controller %s: CameraRootComp still NULL, waiting..."), *GetName());
+				return;
+			}
+		}
+		else
+		{
+			return;
+		}
+	}
+	float YawRotation, PitchRotation;
 	// Yaw rotation calculation
 	float CurrDelta = MouseInputYaw + YawRotationDelta;
 	// Check if we reached to yaw limit
@@ -38,7 +95,7 @@ void ASchemePlayerController::HandleClampedRotation(float MouseInputYaw, float M
 		// We didn't reach to limit
 		YawRotationDelta = CurrDelta;
 		// Rotate with MouseInputYaw value
-		AddYawInput(MouseInputYaw);
+		YawRotation = MouseInputYaw;
 	}
 	else
 	{
@@ -47,7 +104,7 @@ void ASchemePlayerController::HandleClampedRotation(float MouseInputYaw, float M
 
 		YawRotationDelta += NewRotationChange;
 		// Rotate with NewRotationChange value
-		AddYawInput(NewRotationChange);
+		YawRotation = NewRotationChange;
 	}
 	// Pitch rotation calculation
 	CurrDelta = MouseInputPitch + PitchRotationDelta;
@@ -57,7 +114,7 @@ void ASchemePlayerController::HandleClampedRotation(float MouseInputYaw, float M
 		// We didn't reach to limit
 		PitchRotationDelta = CurrDelta;
 		// Rotate with MouseInputPitch value
-		AddPitchInput(-MouseInputPitch);
+		PitchRotation = MouseInputPitch;
 	}
 	else
 	{
@@ -66,16 +123,39 @@ void ASchemePlayerController::HandleClampedRotation(float MouseInputYaw, float M
 
 		PitchRotationDelta += NewRotationChange;
 		// Rotate with NewRotationChange value
-		AddPitchInput(-NewRotationChange);
+		PitchRotation = NewRotationChange;
 	}
-	
+	CameraRootComp->AddLocalRotation(FRotator(PitchRotation, YawRotation, 0));
+	FRotator CurrentRotation = CameraRootComp->GetRelativeRotation();
+	HandleRotationInServer(CurrentRotation.Yaw, CurrentRotation.Pitch);
 }
 
-FHitResult ASchemePlayerController::InteractionPrimaryTracer()
+void ASchemePlayerController::HandleRotationInServer_Implementation(float Yaw, float Pitch)
 {
-	if (UInteractionComponent* InteractComp = GetPawn()->GetComponentByClass<UInteractionComponent>())
+	// Runs in the server
+	ASchemePlayerPawn* PlayerPawn = Cast<ASchemePlayerPawn>(GetPawn());
+	if (!PlayerPawn)
 	{
-		return InteractComp->CheckInteractionLineTrace();
+		UE_LOG(LogTemp, Error, TEXT("Controller %s: GetPawn() is NULL!"), *GetName());
+		return;
 	}
-	return FHitResult();
+
+	USceneComponent* CameraRoot = PlayerPawn->GetCameraRootComp();
+	if (!CameraRoot)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Controller %s: CameraRoot is NULL in Pawn %s!"), 
+			*GetName(), *PlayerPawn->GetName());
+		return;
+	}
+
+	// Apply rotation on the server
+	FRotator NewRotation = FRotator(Pitch, Yaw, 0);
+	CameraRoot->SetRelativeRotation(NewRotation);
+	
+	// Update the replicated variable (send to other clients)
+	PlayerPawn->CameraRotation = NewRotation;
+	
+	UE_LOG(LogTemp, Display, TEXT("SERVER: Rotation updated for %s to %s"), 
+		*PlayerPawn->GetName(), *NewRotation.ToString());
 }
+
