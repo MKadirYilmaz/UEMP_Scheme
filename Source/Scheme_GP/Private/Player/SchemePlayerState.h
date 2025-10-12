@@ -14,6 +14,8 @@ class ASchemePlayerState : public APlayerState
 {
 	GENERATED_BODY()
 
+protected:
+	virtual void BeginPlay() override;
 public:
 	ASchemePlayerState();
 
@@ -34,7 +36,19 @@ public:
 	void OnGoldChange(int32 NewGold, int32 Delta);
 	UFUNCTION(BlueprintImplementableEvent, Category = "Card")
 	void OnCardChange(const TArray<class UCardDataAsset*>& NewCards);
-private:
+
+	FTransform GetNextCardHoldingPoint();
+protected:
+	UPROPERTY(EditDefaultsOnly, Category = "Card")
+	TArray<USceneComponent*> CardHoldingPoints;
+	UPROPERTY(EditDefaultsOnly, Category = "Card System")
+	TSubclassOf<class AActor> CardTableClass;
+
+	class ACardTable* CardTable;
+
+	int32 PlayerIndex = 0;
+	int32 CardHoldingPointIndex = 0;
+	
 	UPROPERTY(ReplicatedUsing = OnRep_Gold, VisibleAnywhere, Category = "Gold")
 	int32 Gold = 0;
 	UPROPERTY(ReplicatedUsing = OnRep_HoldingCards, VisibleAnywhere, Category = "Card")
@@ -48,4 +62,7 @@ private:
 	// Called only on clients when the value has changed
 	UFUNCTION()
 	void OnRep_HoldingCards();
+
+public:
+	FORCEINLINE void SetPlayerIndex(int32 NewIndex) { PlayerIndex = NewIndex; }
 };

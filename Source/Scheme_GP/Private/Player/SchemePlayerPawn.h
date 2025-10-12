@@ -34,7 +34,7 @@ public:
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Components")
 	class UInteractionComponent* InteractionComp;
-
+	
 	UCameraComponent* CameraComp;
 	USceneComponent* CameraRootComp;
 	ASchemePlayerController* PlayerController;

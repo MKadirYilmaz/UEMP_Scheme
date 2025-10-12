@@ -8,12 +8,13 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "Player/SchemePlayerState.h"
 #include "GameFramework/PlayerStart.h"
+#include "Gameplay/Actors/CardActor.h"
 
 
 void ASchemeGameMode::BeginPlay()
 {
 	Super::BeginPlay();
-
+	FindAllStartLocations();
 	UE_LOG(LogTemp, Display, TEXT("This is GameMode! Authority Check: %s"),
 		HasAuthority() ? TEXT("TRUE (Server)") : TEXT("FALSE"));
 }
@@ -29,6 +30,8 @@ void ASchemeGameMode::PostLogin(APlayerController* NewPlayer)
 	if (ASchemePlayerState* PlayerState = NewPlayer->GetPlayerState<ASchemePlayerState>())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("		Player State Created! %s"), *PlayerState->GetName());
+		PlayerState->SetPlayerIndex(CurrentPlayers.Num());
+		
 		CurrentPlayers.Add(NewPlayer);
 		
 		if (CurrentPlayers.Num() > MinPlayer && CurrentPlayers.Num() < MaxPlayer)
@@ -71,13 +74,15 @@ void ASchemeGameMode::TryProcessGoldOutcome_Implementation(APlayerController* Re
 
 AActor* ASchemeGameMode::ChoosePlayerStart_Implementation(AController* Player)
 {
-	if (PlayerStartLocations.Num() > 0)
+	if (PlayerStartLocations.IsEmpty())
+		FindAllStartLocations();
+	if (PlayerStartLocations.Num() > GetNumPlayers() && PlayerStartLocations[GetNumPlayers() - 1])
 	{
-		APlayerStart* PlayerStart = PlayerStartLocations[0];
-		PlayerStartLocations.RemoveAt(0);
+		UE_LOG(LogTemp, Warning, TEXT("Spawning Player: %s, Current Player Number: %d"), *Player->GetName(), GetNumPlayers());
+		APlayerStart* PlayerStart = PlayerStartLocations[GetNumPlayers() - 1];
 		return PlayerStart;
 	}
-	
+	UE_LOG(LogTemp, Error, TEXT("Player Start Couldn't Found!"));
 	return Super::ChoosePlayerStart_Implementation(Player);
 }
 
@@ -137,7 +142,12 @@ void ASchemeGameMode::DrawCard(ASchemePlayerState* PlayerState)
 	if (VirtualGameDeck.Num() == 0) return;
 	UCardDataAsset* Card = VirtualGameDeck.Pop();
 
+	// Add Virtual Card
 	PlayerState->AddCardToHand(Card);
+	// Spawn Visual Actor
+	FTransform SpawnTransform = PlayerState->GetNextCardHoldingPoint();
+	ACardActor* SpawnedCard = GetWorld()->SpawnActor<ACardActor>(CardActorClass, SpawnTransform.GetLocation(), SpawnTransform.GetRotation().Rotator());
+	SpawnedCard->SetCardData(Card);
 }
 
 void ASchemeGameMode::StartSchemeGame()
@@ -162,11 +172,18 @@ void ASchemeGameMode::FindAllStartLocations()
 {
 	TArray<AActor*> FoundActors;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), APlayerStart::StaticClass(), FoundActors);
-	for (AActor* Actor : FoundActors)
+
+	PlayerStartLocations.SetNum(8);
+	
+	for (AActor* FoundActor : FoundActors)
 	{
-		if (APlayerStart* PlayerStart = Cast<APlayerStart>(Actor))
+		APlayerStart* PlayerStart = Cast<APlayerStart>(FoundActor);
+		if (!PlayerStart) continue;
+
+		for (int32 i = 0; i < 8; i++)
 		{
-			PlayerStartLocations.Add(PlayerStart);
+			if (PlayerStart->PlayerStartTag.IsEqual(*FString::Printf(TEXT("Player%d"), i)))
+				PlayerStartLocations[i] = PlayerStart;
 		}
 	}
 }

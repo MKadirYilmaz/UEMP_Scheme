@@ -84,6 +84,8 @@ private:
 	TArray<class UCardDataAsset*> AllCardDataTypes;
 	UPROPERTY(VisibleAnywhere, Category = "Card System")
 	TArray<class UCardDataAsset*> VirtualGameDeck;
+	UPROPERTY(EditDefaultsOnly, Category = "Card System")
+	TSubclassOf<class ACardActor> CardActorClass;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Gameplay Adjustments")
 	int32 MinPlayer = 2;
@@ -94,6 +96,7 @@ private:
 	int32 CardAmountPerPlayer = 2;
 	
 	TArray<APlayerController*> CurrentPlayers;
+	UPROPERTY(VisibleAnywhere, Category = "Spawn System")
 	TArray<class APlayerStart*> PlayerStartLocations;
 
 	bool bCanGameStart = false;

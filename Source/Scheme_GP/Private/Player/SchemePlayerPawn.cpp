@@ -45,7 +45,6 @@ void ASchemePlayerPawn::BeginPlay()
 			}
 		}
 		
-		
 		if (PlayerController)
 		{
 			PlayerController->SetCameraRootComponent(CameraRootComp);
@@ -79,7 +78,7 @@ void ASchemePlayerPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(ASchemePlayerPawn, CameraRotation);
+	DOREPLIFETIME_CONDITION(ASchemePlayerPawn, CameraRotation, COND_SkipOwner);
 }
 
 void ASchemePlayerPawn::OnRep_CameraRotation()
@@ -88,8 +87,8 @@ void ASchemePlayerPawn::OnRep_CameraRotation()
 	if (CameraRootComp && !IsLocallyControlled())
 	{
 		CameraRootComp->SetRelativeRotation(CameraRotation);
-		UE_LOG(LogTemp, Display, TEXT("REMOTE Pawn %s: Rotation Updated to %s"), 
-			*GetName(), *CameraRotation.ToString());
+		//UE_LOG(LogTemp, Display, TEXT("REMOTE Pawn %s: Rotation Updated to %s"), 
+		//	*GetName(), *CameraRotation.ToString());
 	}
 }
 

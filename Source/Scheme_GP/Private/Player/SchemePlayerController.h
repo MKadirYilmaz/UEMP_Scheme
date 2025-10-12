@@ -78,8 +78,8 @@ private:
 
 	USceneComponent* CameraRootComp;
 	
-	float YawRotationDelta;
-	float PitchRotationDelta;
+	float CurrentYawDelta;
+	float CurrentPitchDelta;
 
 	/**
 	 * Indicates whether camera rotation functionality is enabled.

@@ -14,11 +14,24 @@ class ACardActor : public ABaseInteractableActor
 {
 	GENERATED_BODY()
 
+public:
+	ACardActor();
 
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	void SetCardData(class UCardDataAsset* NewData);
 protected:
-	UPROPERTY(EditDefaultsOnly, Category = "Card Data")
+	UPROPERTY(EditDefaultsOnly, Category = "Card Visual")
+	UStaticMeshComponent* CardMesh;
+
+	UPROPERTY(ReplicatedUsing = OnRep_CardData, VisibleAnywhere, Category = "Card Data")
 	class UCardDataAsset* CardData;
 
+	UFUNCTION()
+	void OnRep_CardData();
+
 public:
+	UFUNCTION(BlueprintCallable)
 	FORCEINLINE class UCardDataAsset* GetCardData() const { return CardData; }
+
 };

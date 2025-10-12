@@ -3,8 +3,20 @@
 
 #include "Player/SchemePlayerState.h"
 
+#include "AudioMixerBlueprintLibrary.h"
 #include "Gameplay/Data/CardDataAsset.h"
+#include "Kismet/GameplayStatics.h"
+#include "Gameplay/Actors/CardTable.h"
 #include "Net/UnrealNetwork.h"
+
+void ASchemePlayerState::BeginPlay()
+{
+	Super::BeginPlay();
+	if (AActor* TableActor = UGameplayStatics::GetActorOfClass(this, CardTableClass))
+	{
+		CardTable = Cast<ACardTable>(TableActor);
+	}
+}
 
 ASchemePlayerState::ASchemePlayerState()
 {
@@ -67,6 +79,17 @@ bool ASchemePlayerState::RemoveGold(int32 amount)
 void ASchemePlayerState::AddCardToHand(UCardDataAsset* NewCard)
 {
 	HoldingCards.Add(NewCard);
+}
+
+FTransform ASchemePlayerState::GetNextCardHoldingPoint()
+{
+	if (!CardTable)
+		return FTransform();
+	if (PlayerIndex >= CardTable->GetCardPointsStructs().Num() || CardHoldingPointIndex >= CardTable->GetCardPointsStructs()[PlayerIndex].CardTransforms.Num())
+		return FTransform();
+	FTransform& Transform = CardTable->GetCardPointsStructs()[PlayerIndex].CardTransforms[CardHoldingPointIndex];
+	CardHoldingPointIndex++;
+	return Transform;
 }
 
 void ASchemePlayerState::OnRep_Gold()

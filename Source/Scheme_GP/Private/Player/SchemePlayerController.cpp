@@ -66,6 +66,7 @@ void ASchemePlayerController::ClientInteractNotify_Implementation(AActor* Intera
 
 void ASchemePlayerController::HandleClampedRotation(float MouseInputYaw, float MouseInputPitch)
 {
+	
 	// If the rotation system disabled then go no further
 	if (!bCameraRotationEnabled)
 		return;
@@ -86,48 +87,31 @@ void ASchemePlayerController::HandleClampedRotation(float MouseInputYaw, float M
 			return;
 		}
 	}
-	float YawRotation, PitchRotation;
-	// Yaw rotation calculation
-	float CurrDelta = MouseInputYaw + YawRotationDelta;
-	// Check if we reached to yaw limit
-	if (MaxYawLimit > UKismetMathLibrary::Abs(CurrDelta))
-	{
-		// We didn't reach to limit
-		YawRotationDelta = CurrDelta;
-		// Rotate with MouseInputYaw value
-		YawRotation = MouseInputYaw;
-	}
-	else
-	{
-		float Delta = UKismetMathLibrary::Abs(CurrDelta) - MaxYawLimit;
-		float NewRotationChange = (MouseInputYaw > 0) ? MouseInputYaw - Delta : MouseInputYaw + Delta;
 
-		YawRotationDelta += NewRotationChange;
-		// Rotate with NewRotationChange value
-		YawRotation = NewRotationChange;
-	}
-	// Pitch rotation calculation
-	CurrDelta = MouseInputPitch + PitchRotationDelta;
-	// Check if we reached to pitch limit
-	if (MaxPitchLimit > UKismetMathLibrary::Abs(CurrDelta))
+	// Calculate what our new delta WOULD be if we applied the full input
+	float ProposedYawDelta = CurrentYawDelta + MouseInputYaw;
+	float ProposedPitchDelta = CurrentPitchDelta + MouseInputPitch;
+	
+	// Clamp the proposed deltas to our limits
+	float ClampedYawDelta = FMath::Clamp(ProposedYawDelta, -MaxYawLimit, MaxYawLimit);
+	float ClampedPitchDelta = FMath::Clamp(ProposedPitchDelta, -MaxPitchLimit, MaxPitchLimit);
+	
+	// Check if there's actual change
+	if (FMath::Abs(ClampedYawDelta - CurrentYawDelta) > KINDA_SMALL_NUMBER || 
+		FMath::Abs(ClampedPitchDelta - CurrentPitchDelta) > KINDA_SMALL_NUMBER)
 	{
-		// We didn't reach to limit
-		PitchRotationDelta = CurrDelta;
-		// Rotate with MouseInputPitch value
-		PitchRotation = MouseInputPitch;
+		// Update our tracked deltas
+		CurrentYawDelta = ClampedYawDelta;
+		CurrentPitchDelta = ClampedPitchDelta;
+		
+		// CRITICAL: Set the rotation directly from deltas, don't add
+		// This prevents Euler angle order issues (Gimbal Lock)
+		FRotator NewRotation = FRotator(CurrentPitchDelta, CurrentYawDelta, 0.f);
+		CameraRootComp->SetRelativeRotation(NewRotation);
+		
+		// Send to server for replication
+		HandleRotationInServer(CurrentYawDelta, CurrentPitchDelta);
 	}
-	else
-	{
-		float Delta = UKismetMathLibrary::Abs(CurrDelta) - MaxPitchLimit;
-		float NewRotationChange = (MouseInputPitch > 0) ? MouseInputPitch - Delta : MouseInputPitch + Delta;
-
-		PitchRotationDelta += NewRotationChange;
-		// Rotate with NewRotationChange value
-		PitchRotation = NewRotationChange;
-	}
-	CameraRootComp->AddLocalRotation(FRotator(PitchRotation, YawRotation, 0));
-	FRotator CurrentRotation = CameraRootComp->GetRelativeRotation();
-	HandleRotationInServer(CurrentRotation.Yaw, CurrentRotation.Pitch);
 }
 
 void ASchemePlayerController::HandleRotationInServer_Implementation(float Yaw, float Pitch)
@@ -155,7 +139,7 @@ void ASchemePlayerController::HandleRotationInServer_Implementation(float Yaw, f
 	// Update the replicated variable (send to other clients)
 	PlayerPawn->CameraRotation = NewRotation;
 	
-	UE_LOG(LogTemp, Display, TEXT("SERVER: Rotation updated for %s to %s"), 
-		*PlayerPawn->GetName(), *NewRotation.ToString());
+	//UE_LOG(LogTemp, Display, TEXT("SERVER: Rotation updated for %s to %s"), 
+	//	*PlayerPawn->GetName(), *NewRotation.ToString());
 }
 
