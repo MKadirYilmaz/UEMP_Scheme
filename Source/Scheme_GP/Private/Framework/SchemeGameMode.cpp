@@ -3,6 +3,7 @@
 
 #include "Framework/SchemeGameMode.h"
 
+#include "SchemeGameState.h"
 #include "GameFramework/GameState.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -33,6 +34,10 @@ void ASchemeGameMode::PostLogin(APlayerController* NewPlayer)
 		PlayerState->SetPlayerIndex(CurrentPlayers.Num());
 		
 		CurrentPlayers.Add(NewPlayer);
+		if (ASchemeGameState* SGS = Cast<ASchemeGameState>(GameState))
+		{
+			SGS->PlayerTurnsOrder.Add(PlayerState);
+		}
 		
 		if (CurrentPlayers.Num() > MinPlayer && CurrentPlayers.Num() < MaxPlayer)
 		{
@@ -59,8 +64,11 @@ void ASchemeGameMode::TryProcessGoldIncome_Implementation(APlayerController* Req
 	ASchemePlayerState* PlayerState = RequestingController->GetPlayerState<ASchemePlayerState>();
 	if (!PlayerState) return;
 
-	PlayerState->AddGold(Amount);
-}
+	if (IsPlayersTurn(RequestingController))
+		PlayerState->AddGold(Amount);
+	else
+		UE_LOG(LogTemp, Error, TEXT("Player %s is not your turn! Can't take gold!"), *RequestingController->GetName());
+}	
 
 void ASchemeGameMode::TryProcessGoldOutcome_Implementation(APlayerController* RequestingController, int32 Amount)
 {
@@ -165,7 +173,32 @@ void ASchemeGameMode::StartSchemeGame()
 	CreateVirtualDeck();
 	ShuffleDeck();
 	DealInitialCards(CardAmountPerPlayer);
+	if (ASchemeGameState* SchemeGameState = GetWorld()->GetGameState<ASchemeGameState>())
+	{
+		SchemeGameState->CurrentPlayerTurn = CurrentPlayers[CurrentTurnIndex]->PlayerState;
+		SchemeGameState->OnRep_CurrentPlayerTurn();
+	}
 	bIsGameStarted = true;
+}
+
+void ASchemeGameMode::AdvanceTurn()
+{
+	if (!bIsGameStarted) return;
+	if (ASchemeGameState* SchemeGameState = GetWorld()->GetGameState<ASchemeGameState>())
+	{
+		CurrentTurnIndex++;
+		if (CurrentTurnIndex >= CurrentPlayers.Num())
+		{
+			CurrentTurnIndex = 0;
+		}
+		SchemeGameState->CurrentPlayerTurn = CurrentPlayers[CurrentTurnIndex]->PlayerState;
+		SchemeGameState->OnRep_CurrentPlayerTurn();
+	}
+}
+
+bool ASchemeGameMode::IsPlayersTurn(const APlayerController* PlayerController) const
+{
+	return PlayerController == CurrentPlayers[CurrentTurnIndex];
 }
 
 void ASchemeGameMode::FindAllStartLocations()

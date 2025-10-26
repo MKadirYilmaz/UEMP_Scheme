@@ -33,6 +33,9 @@ public:
 
 	UFUNCTION(Client, Reliable, Category = "Interaction")
 	void ClientInteractNotify(AActor* InteractActor, APawn* Interactor);
+
+	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "Turn System")
+	void SendServerFinishTurnRequest();
 private:
 	/**
 	 * Handles camera rotation based on mouse input while enforcing yaw and pitch rotation limits.

@@ -74,10 +74,13 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void StartSchemeGame();
 
+	UFUNCTION(BlueprintCallable)
+	void AdvanceTurn();
+
 	UFUNCTION(BlueprintImplementableEvent)
 	void OnCanGameStartValid();
 private:
-
+	bool IsPlayersTurn(const APlayerController* PlayerController) const;
 	void FindAllStartLocations();
 private:
 	UPROPERTY(EditDefaultsOnly, Category = "Card System")
@@ -102,6 +105,7 @@ private:
 	bool bCanGameStart = false;
 	bool bIsGameStarted = false;
 
+	int32 CurrentTurnIndex = 0;
 public:
 	UFUNCTION(BlueprintCallable)
 	FORCEINLINE bool GetCanGameStart() const { return bCanGameStart; }

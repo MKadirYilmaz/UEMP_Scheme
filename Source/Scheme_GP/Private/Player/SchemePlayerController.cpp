@@ -6,8 +6,9 @@
 #include "SchemePlayerPawn.h"
 #include "Net/UnrealNetwork.h"
 #include "Framework/SchemeGameMode.h"
+#include "Framework/SchemeGameState.h"
+#include "GameFramework/PlayerState.h"
 #include "Interface/InteractableInterface.h"
-#include "Kismet/KismetMathLibrary.h"
 
 ASchemePlayerController::ASchemePlayerController()
 {
@@ -62,6 +63,23 @@ void ASchemePlayerController::ServerRequestInteract_Implementation(AActor* Inter
 void ASchemePlayerController::ClientInteractNotify_Implementation(AActor* InteractActor, APawn* Interactor)
 {
 	IInteractableInterface::Execute_OnInteractionSuccessInClient(InteractActor, Interactor);
+}
+
+void ASchemePlayerController::SendServerFinishTurnRequest_Implementation()
+{
+	ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>();
+	ASchemeGameState* SchemeGameState = Cast<ASchemeGameState>(GetWorld()->GetGameState());
+	if (GameMode && SchemeGameState)
+	{
+		if (SchemeGameState->CurrentPlayerTurn == PlayerState)
+		{
+			GameMode->AdvanceTurn();
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("Turn is not your's to finish!"));
+		}
+	}
 }
 
 void ASchemePlayerController::HandleClampedRotation(float MouseInputYaw, float MouseInputPitch)
