@@ -36,6 +36,14 @@ void ASchemePlayerController::BeginPlay()
 	}
 }
 
+void ASchemePlayerController::SendGameStartRequestToServer_Implementation()
+{
+	if (ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>())
+	{
+		GameMode->StartSchemeGame();
+	}
+}
+
 void ASchemePlayerController::SendGoldOutcomeRequestToServer_Implementation(int32 Amount)
 {
 	if (ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>())
@@ -46,8 +54,10 @@ void ASchemePlayerController::SendGoldOutcomeRequestToServer_Implementation(int3
 
 void ASchemePlayerController::SendGoldIncomeRequestToServer_Implementation(int32 Amount)
 {
+	UE_LOG(LogTemp, Display, TEXT("Sending"));
 	if (ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>())
 	{
+		UE_LOG(LogTemp, Display, TEXT("CLIENT: Sending Gold Income Request to Server: %d"), Amount);
 		GameMode->TryProcessGoldIncome(this, Amount);
 	}
 }
@@ -122,7 +132,6 @@ void ASchemePlayerController::HandleClampedRotation(float MouseInputYaw, float M
 		CurrentYawDelta = ClampedYawDelta;
 		CurrentPitchDelta = ClampedPitchDelta;
 		
-		// CRITICAL: Set the rotation directly from deltas, don't add
 		// This prevents Euler angle order issues (Gimbal Lock)
 		FRotator NewRotation = FRotator(CurrentPitchDelta, CurrentYawDelta, 0.f);
 		CameraRootComp->SetRelativeRotation(NewRotation);

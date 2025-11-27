@@ -16,11 +16,14 @@ void ASchemeGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 
 void ASchemeGameState::OnRep_CurrentPlayerTurn()
 {
-	/*
-	UE_LOG(LogTemp, Warning, TEXT(" (%s): Current Player Turn Changed! New Player In Turn: %s"),
-		(HasAuthority()) ? TEXT("Server") : TEXT("Client"),
-		*CurrentPlayerTurn->GetName());
-	*/
+	if (!CurrentPlayerTurn || !CurrentPlayerTurn->GetPawn())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Current Player Turn or its Pawn is NULL!"));
+		return;
+	}
+	FVector Start = CurrentPlayerTurn->GetPawn()->GetActorLocation();
+	DrawDebugLine(GetWorld(), Start,Start + FVector(0,0,300.f), 
+		FColor::Green, false, 5.f, 0, 5.f);
 }
 
 void ASchemeGameState::OnRep_PlayerTurnsOrder()

@@ -4,12 +4,13 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
+#include "Interface/InteractableInterface.h"
 #include "SchemePlayerPawn.generated.h"
 
 class UCameraComponent;
 class ASchemePlayerController;
 UCLASS()
-class ASchemePlayerPawn : public APawn
+class ASchemePlayerPawn : public APawn, public IInteractableInterface
 {
 	GENERATED_BODY()
 
@@ -21,10 +22,14 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
+	virtual void OnBeginFocus_Implementation(APawn* Interactor) override;
+	virtual void OnEndFocus_Implementation(APawn* Interactor) override;
+	virtual void OnInteract_Implementation(APawn* Interactor) override;
+	
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
-
+	
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 

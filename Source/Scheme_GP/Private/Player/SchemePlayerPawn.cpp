@@ -60,6 +60,21 @@ void ASchemePlayerPawn::BeginPlay()
 	
 }
 
+void ASchemePlayerPawn::OnBeginFocus_Implementation(APawn* Interactor)
+{
+	IInteractableInterface::OnBeginFocus_Implementation(Interactor);
+}
+
+void ASchemePlayerPawn::OnEndFocus_Implementation(APawn* Interactor)
+{
+	IInteractableInterface::OnEndFocus_Implementation(Interactor);
+}
+
+void ASchemePlayerPawn::OnInteract_Implementation(APawn* Interactor)
+{
+	IInteractableInterface::OnInteract_Implementation(Interactor);
+}
+
 // Called every frame
 void ASchemePlayerPawn::Tick(float DeltaTime)
 {
@@ -87,8 +102,6 @@ void ASchemePlayerPawn::OnRep_CameraRotation()
 	if (CameraRootComp && !IsLocallyControlled())
 	{
 		CameraRootComp->SetRelativeRotation(CameraRotation);
-		//UE_LOG(LogTemp, Display, TEXT("REMOTE Pawn %s: Rotation Updated to %s"), 
-		//	*GetName(), *CameraRotation.ToString());
 	}
 }
 

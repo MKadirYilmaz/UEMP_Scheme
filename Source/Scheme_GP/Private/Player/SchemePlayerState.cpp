@@ -44,7 +44,7 @@ void ASchemePlayerState::AddGold(int32 amount)
 	}
 	CachedDelta = amount;
 	Gold += amount;
-	UE_LOG(LogTemp, Display, TEXT("SERVER: New Gold: %d"), Gold);
+	UE_LOG(LogTemp, Warning, TEXT("SERVER: New Gold: %d"), Gold);
 
 	// Notify blueprint on server
 	OnGoldChange(Gold, amount);

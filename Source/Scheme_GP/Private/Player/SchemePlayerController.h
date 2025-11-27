@@ -20,6 +20,9 @@ protected:
 	virtual void BeginPlay() override;
 	
 public:
+	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "Game System")
+	void SendGameStartRequestToServer();
+	
 	// Called on a client, runs on the server
 	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "Gold System")
 	void SendGoldIncomeRequestToServer(int32 Amount);

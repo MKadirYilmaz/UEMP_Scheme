@@ -44,8 +44,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Card System")
 	TSubclassOf<class AActor> CardTableClass;
 
+	UPROPERTY()
 	class ACardTable* CardTable;
 
+	UPROPERTY(VisibleAnywhere)
 	int32 PlayerIndex = 0;
 	int32 CardHoldingPointIndex = 0;
 	

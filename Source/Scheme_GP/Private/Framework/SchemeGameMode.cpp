@@ -39,7 +39,7 @@ void ASchemeGameMode::PostLogin(APlayerController* NewPlayer)
 			SGS->PlayerTurnsOrder.Add(PlayerState);
 		}
 		
-		if (CurrentPlayers.Num() > MinPlayer && CurrentPlayers.Num() < MaxPlayer)
+		if (CurrentPlayers.Num() >= MinPlayer && CurrentPlayers.Num() <= MaxPlayer)
 		{
 			bCanGameStart = true;
 			OnCanGameStartValid();
@@ -59,11 +59,19 @@ void ASchemeGameMode::Logout(AController* Exiting)
 
 void ASchemeGameMode::TryProcessGoldIncome_Implementation(APlayerController* RequestingController, int32 Amount)
 {
-	if (!RequestingController) return;
+	UE_LOG(LogTemp, Warning, TEXT("TryProcessGoldIncome Called"));
+	if (!RequestingController)
+	{
+		UE_LOG(LogTemp, Error, TEXT("RequestingController is NULL!") );
+		return;
+	}
 
 	ASchemePlayerState* PlayerState = RequestingController->GetPlayerState<ASchemePlayerState>();
-	if (!PlayerState) return;
-
+	if (!PlayerState)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Player State is NULL!") );
+		return;
+	}
 	if (IsPlayersTurn(RequestingController))
 		PlayerState->AddGold(Amount);
 	else

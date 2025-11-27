@@ -98,6 +98,7 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Gameplay Adjustments")
 	int32 CardAmountPerPlayer = 2;
 	
+	UPROPERTY()
 	TArray<APlayerController*> CurrentPlayers;
 	UPROPERTY(VisibleAnywhere, Category = "Spawn System")
 	TArray<class APlayerStart*> PlayerStartLocations;
