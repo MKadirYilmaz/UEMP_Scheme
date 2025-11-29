@@ -30,15 +30,30 @@ public:
 	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "Gold System")
 	void SendGoldOutcomeRequestToServer(int32 Amount);
 	
+	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "Action System")
+	void SendActionRequestToServer();
+	
+	UFUNCTION(Client, Reliable, Category = "Game System")
+	void ClientReceiveActionNotification();
+	
 	// Called in clients, works in server
 	UFUNCTION(Server, Reliable, Category = "Interaction")
 	void ServerRequestInteract(AActor* InteractActor, APawn* Interactor);
 
 	UFUNCTION(Client, Reliable, Category = "Interaction")
 	void ClientInteractNotify(AActor* InteractActor, APawn* Interactor);
+	
+	UFUNCTION(Client, Reliable, Category = "Game System")
+	void ClientReceiveStartGameNotification();
 
 	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "Turn System")
 	void SendServerFinishTurnRequest();
+	
+protected:
+	
+	UFUNCTION(BlueprintImplementableEvent, Category = "Game System")
+	void OnReceiveStartGameNotification();
+	
 private:
 	/**
 	 * Handles camera rotation based on mouse input while enforcing yaw and pitch rotation limits.

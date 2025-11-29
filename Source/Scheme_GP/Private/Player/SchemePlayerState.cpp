@@ -28,6 +28,7 @@ void ASchemePlayerState::GetLifetimeReplicatedProps(TArray<class FLifetimeProper
 
 	DOREPLIFETIME(ASchemePlayerState, Gold);
 	DOREPLIFETIME(ASchemePlayerState, HoldingCards);
+	DOREPLIFETIME(ASchemePlayerState, PlayerIndex);
 }
 
 void ASchemePlayerState::AddGold(int32 amount)
@@ -104,4 +105,9 @@ void ASchemePlayerState::OnRep_HoldingCards()
 
 	OnCardChange(HoldingCards);
 	UE_LOG(LogTemp, Display, TEXT("Holding Cards Have Changed In: %s"), *GetName());
+}
+
+void ASchemePlayerState::OnRep_PlayerIndex()
+{
+	UE_LOG(LogTemp, Display, TEXT("Player Index Changed: %s"), *GetName());
 }

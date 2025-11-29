@@ -10,6 +10,7 @@
 #include "Player/SchemePlayerState.h"
 #include "GameFramework/PlayerStart.h"
 #include "Gameplay/Actors/CardActor.h"
+#include "Player/SchemePlayerController.h"
 
 
 void ASchemeGameMode::BeginPlay()
@@ -86,6 +87,22 @@ void ASchemeGameMode::TryProcessGoldOutcome_Implementation(APlayerController* Re
 	if (!PlayerState) return ;
 	
 	PlayerState->RemoveGold(Amount);
+}
+
+void ASchemeGameMode::ProcessPlayerAction(APlayerController* RequestingController)
+{
+	// Process any server-side logic for the player's action here
+	BroadcastPlayerActionNotification();
+}
+
+void ASchemeGameMode::BroadcastPlayerActionNotification()
+{
+	for (APlayerController* PlayerController : CurrentPlayers)
+	{
+		ASchemePlayerController* SchemePlayerController = Cast<ASchemePlayerController>(PlayerController);
+		if (!SchemePlayerController) continue;
+		SchemePlayerController->ClientReceiveActionNotification();
+	}
 }
 
 AActor* ASchemeGameMode::ChoosePlayerStart_Implementation(AController* Player)
@@ -187,6 +204,14 @@ void ASchemeGameMode::StartSchemeGame()
 		SchemeGameState->OnRep_CurrentPlayerTurn();
 	}
 	bIsGameStarted = true;
+	
+	for (APlayerController* PlayerController : CurrentPlayers)
+	{
+		if (ASchemePlayerController* SchemePC = Cast<ASchemePlayerController>(PlayerController))
+		{
+			SchemePC->ClientReceiveStartGameNotification();
+		}
+	}
 }
 
 void ASchemeGameMode::AdvanceTurn()

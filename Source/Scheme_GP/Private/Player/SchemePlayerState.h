@@ -47,7 +47,7 @@ protected:
 	UPROPERTY()
 	class ACardTable* CardTable;
 
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(ReplicatedUsing = OnRep_PlayerIndex, VisibleAnywhere)
 	int32 PlayerIndex = 0;
 	int32 CardHoldingPointIndex = 0;
 	
@@ -64,6 +64,9 @@ protected:
 	// Called only on clients when the value has changed
 	UFUNCTION()
 	void OnRep_HoldingCards();
+	// Called only on clients when the value has changed
+	UFUNCTION()
+	void OnRep_PlayerIndex();
 
 public:
 	FORCEINLINE void SetPlayerIndex(int32 NewIndex) { PlayerIndex = NewIndex; }

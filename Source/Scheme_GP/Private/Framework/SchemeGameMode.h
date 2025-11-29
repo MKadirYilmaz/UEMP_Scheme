@@ -29,6 +29,10 @@ public:
 	UFUNCTION(Server, Reliable, Category = "Gold System")
 	void TryProcessGoldOutcome(APlayerController* RequestingController, int32 Amount);
 
+	void ProcessPlayerAction(APlayerController* RequestingController);
+	
+	void BroadcastPlayerActionNotification();
+
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 	
 	UFUNCTION(BlueprintCallable)

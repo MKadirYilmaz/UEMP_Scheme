@@ -36,6 +36,19 @@ void ASchemePlayerController::BeginPlay()
 	}
 }
 
+void ASchemePlayerController::ClientReceiveActionNotification_Implementation()
+{
+	UE_LOG(LogTemp, Display, TEXT("Client: Received Action Notification"));
+}
+
+void ASchemePlayerController::SendActionRequestToServer_Implementation()
+{
+	if (ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>())
+	{
+		GameMode->ProcessPlayerAction(this);
+	}
+}
+
 void ASchemePlayerController::SendGameStartRequestToServer_Implementation()
 {
 	if (ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>())
@@ -67,6 +80,7 @@ void ASchemePlayerController::ServerRequestInteract_Implementation(AActor* Inter
 	UE_LOG(LogTemp, Display, TEXT("SERVER: Interact Requested By %s"), *Interactor->GetName());
 
 	IInteractableInterface::Execute_OnInteract(InteractActor, Interactor);
+	
 	ClientInteractNotify(InteractActor, Interactor);
 }
 
@@ -90,6 +104,11 @@ void ASchemePlayerController::SendServerFinishTurnRequest_Implementation()
 			UE_LOG(LogTemp, Error, TEXT("Turn is not your's to finish!"));
 		}
 	}
+}
+
+void ASchemePlayerController::ClientReceiveStartGameNotification_Implementation()
+{
+	OnReceiveStartGameNotification();
 }
 
 void ASchemePlayerController::HandleClampedRotation(float MouseInputYaw, float MouseInputPitch)
