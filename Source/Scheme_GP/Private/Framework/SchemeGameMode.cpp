@@ -3,14 +3,17 @@
 
 #include "Framework/SchemeGameMode.h"
 
-#include "SchemeGameState.h"
-#include "GameFramework/GameState.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
-#include "Player/SchemePlayerState.h"
 #include "GameFramework/PlayerStart.h"
-#include "Gameplay/Actors/CardActor.h"
+
+#include "SchemeGameState.h"
+#include "Player/SchemePlayerState.h"
 #include "Player/SchemePlayerController.h"
+
+#include "Gameplay/Actors/CardActor.h"
+#include "Gameplay/Action/BaseAction.h"
+#include "Gameplay/Data/ActionDataAsset.h"
 
 
 void ASchemeGameMode::BeginPlay()
@@ -58,50 +61,102 @@ void ASchemeGameMode::Logout(AController* Exiting)
 	UE_LOG(LogTemp, Display, TEXT("Player Has Left! %s"), *Exiting->GetName());
 }
 
-void ASchemeGameMode::TryProcessGoldIncome_Implementation(APlayerController* RequestingController, int32 Amount)
-{
-	UE_LOG(LogTemp, Warning, TEXT("TryProcessGoldIncome Called"));
-	if (!RequestingController)
-	{
-		UE_LOG(LogTemp, Error, TEXT("RequestingController is NULL!") );
-		return;
-	}
-
-	ASchemePlayerState* PlayerState = RequestingController->GetPlayerState<ASchemePlayerState>();
-	if (!PlayerState)
-	{
-		UE_LOG(LogTemp, Error, TEXT("Player State is NULL!") );
-		return;
-	}
-	if (IsPlayersTurn(RequestingController))
-		PlayerState->AddGold(Amount);
-	else
-		UE_LOG(LogTemp, Error, TEXT("Player %s is not your turn! Can't take gold!"), *RequestingController->GetName());
-}	
-
-void ASchemeGameMode::TryProcessGoldOutcome_Implementation(APlayerController* RequestingController, int32 Amount)
-{
-	if (!RequestingController) return;
-
-	ASchemePlayerState* PlayerState = RequestingController->GetPlayerState<ASchemePlayerState>();
-	if (!PlayerState) return ;
-	
-	PlayerState->RemoveGold(Amount);
-}
-
-void ASchemeGameMode::ProcessPlayerAction(APlayerController* RequestingController)
+void ASchemeGameMode::ProcessPlayerAction(ASchemePlayerController* RequestingController, UActionDataAsset* ActionData, ASchemePlayerController* TargetController)
 {
 	// Process any server-side logic for the player's action here
-	BroadcastPlayerActionNotification();
+	if (!ActionData || !ActionData->ActionLogicClass) return;
+	
+	UBaseAction* ActionInstance = NewObject<UBaseAction>(this, ActionData->ActionLogicClass);
+	
+	if (!ActionInstance) return;
+	
+	// Notify all players about the action being performed
+	if (ActionData->bCanBeInterrupted)
+	{
+		
+		CurrChallengeAction = ActionData;
+		CurrActionController = RequestingController;
+		CurrTargetController = TargetController;
+		
+		FNotificationPacket Packet = {
+			ServerNotificationMap.Find(EServerNotificationType::ChallengeNotification)->Get(),
+			FText(),
+			ActionData
+		};
+		BroadcastPlayerActionNotification(RequestingController, TargetController, Packet);
+		// Extra protection against multiple timers
+		if (ChallengeTimeoutHandle.IsValid())
+		{
+			GetWorldTimerManager().ClearTimer(ChallengeTimeoutHandle);
+		}
+		// Last timer is now unusable, recreate it
+		ChallengeTimeoutHandle = FTimerHandle{};
+		// Wait for challenge responses before executing the action
+		GetWorld()->GetTimerManager().SetTimer(ChallengeTimeoutHandle, this, &ASchemeGameMode::BroadcastTimeoutNotification, 10.0f, false);
+		
+	}
+	// Execute the action immediately
+	else
+	{
+		FNotificationPacket Packet = {
+			ServerNotificationMap.Find(EServerNotificationType::GeneralNotification)->Get(),
+			FText::FromString("An action has been executed."),
+			ActionData
+		};
+
+		BroadcastNotificationPacket(Packet);
+		ActionInstance->ExecuteAction(RequestingController, TargetController);
+	}
 }
 
-void ASchemeGameMode::BroadcastPlayerActionNotification()
+void ASchemeGameMode::BroadcastPlayerActionNotification(ASchemePlayerController* ActionDealer, ASchemePlayerController* ActionTarget, FNotificationPacket& Packet)
+{
+	for (APlayerController* PlayerController : CurrentPlayers)
+	{
+		ASchemePlayerController* SchemePlayerController = Cast<ASchemePlayerController>(PlayerController);
+		if (!SchemePlayerController || SchemePlayerController == ActionDealer) continue;
+		
+		if (SchemePlayerController == ActionTarget)
+		{
+			Packet.NotificationMessage = FText::FromString("You are being targeted by an action!");
+			SchemePlayerController->Client_ReceiveNotification(Packet);
+		}
+		else
+		{
+			Packet.NotificationMessage = FText::FromString("Another player is being targeted by an action!");
+			SchemePlayerController->Client_ReceiveNotification(Packet);
+		}
+	}
+}
+
+void ASchemeGameMode::BroadcastTimeoutNotification()
+{
+	for (APlayerController* PlayerController : CurrentPlayers)
+	{
+		FNotificationPacket Packet = {
+			ServerNotificationMap.Find(EServerNotificationType::TimeoutNotification)->Get(),
+			FText::FromString("The action challenge period has timed out.")
+		};
+		ASchemePlayerController* SchemePlayerController = Cast<ASchemePlayerController>(PlayerController);
+		if (!SchemePlayerController) continue;
+		
+		SchemePlayerController->Client_ReceiveNotification(Packet);
+	}
+	
+	// Execute the action since the challenge period has ended
+	UBaseAction* ActionInstance = NewObject<UBaseAction>(this, CurrChallengeAction->ActionLogicClass);
+	if (!ActionInstance) return;
+	ActionInstance->ExecuteAction(CurrActionController, CurrTargetController);
+}
+
+void ASchemeGameMode::BroadcastNotificationPacket(const FNotificationPacket& Packet)
 {
 	for (APlayerController* PlayerController : CurrentPlayers)
 	{
 		ASchemePlayerController* SchemePlayerController = Cast<ASchemePlayerController>(PlayerController);
 		if (!SchemePlayerController) continue;
-		SchemePlayerController->ClientReceiveActionNotification();
+		
+		SchemePlayerController->Client_ReceiveNotification(Packet);
 	}
 }
 
@@ -117,6 +172,39 @@ AActor* ASchemeGameMode::ChoosePlayerStart_Implementation(AController* Player)
 	}
 	UE_LOG(LogTemp, Error, TEXT("Player Start Couldn't Found!"));
 	return Super::ChoosePlayerStart_Implementation(Player);
+}
+
+void ASchemeGameMode::BreakTimeoutCountdown()
+{
+	GetWorldTimerManager().ClearTimer(ChallengeTimeoutHandle);
+	
+	FNotificationPacket Packet = {
+		ServerNotificationMap.Find(EServerNotificationType::TimeoutNotification)->Get(),
+		FText::FromString("Someone challenged the action!"),
+	};
+	BroadcastNotificationPacket(Packet);
+}
+
+void ASchemeGameMode::ProcessChallengeRequest()
+{
+	if (!CurrChallengeAction || !CurrActionController)
+	{
+		UE_LOG(LogTemp, Error, TEXT("No current challenge action or action controller set!"));
+		return;
+	}
+	// Determine who won the challenge (for simplicity, we'll assume the action always succeeds here)
+	
+	BreakTimeoutCountdown();
+	
+	FNotificationPacket Packet = {
+		ServerNotificationMap.Find(EServerNotificationType::GeneralNotification)->Get(),
+		FText::FromString("The challenge has been resolved."),
+		CurrChallengeAction
+	};
+	BroadcastNotificationPacket(Packet);
+	UBaseAction* ActionInstance = NewObject<UBaseAction>(this, CurrChallengeAction->ActionLogicClass);
+	if (!ActionInstance) return;
+	ActionInstance->ExecuteAction(CurrActionController, CurrTargetController);
 }
 
 void ASchemeGameMode::CreateVirtualDeck()
@@ -209,31 +297,11 @@ void ASchemeGameMode::StartSchemeGame()
 	{
 		if (ASchemePlayerController* SchemePC = Cast<ASchemePlayerController>(PlayerController))
 		{
-			SchemePC->ClientReceiveStartGameNotification();
+			TSubclassOf<USchemeNotification> NotifyClass = ServerNotificationMap.Find(EServerNotificationType::GameStartNotification)->Get();
+			SchemePC->Client_ReceiveNotification(FNotificationPacket{NotifyClass, FText::FromString("The Game Has Started!")});
 		}
 	}
 }
-
-void ASchemeGameMode::AdvanceTurn()
-{
-	if (!bIsGameStarted) return;
-	if (ASchemeGameState* SchemeGameState = GetWorld()->GetGameState<ASchemeGameState>())
-	{
-		CurrentTurnIndex++;
-		if (CurrentTurnIndex >= CurrentPlayers.Num())
-		{
-			CurrentTurnIndex = 0;
-		}
-		SchemeGameState->CurrentPlayerTurn = CurrentPlayers[CurrentTurnIndex]->PlayerState;
-		SchemeGameState->OnRep_CurrentPlayerTurn();
-	}
-}
-
-bool ASchemeGameMode::IsPlayersTurn(const APlayerController* PlayerController) const
-{
-	return PlayerController == CurrentPlayers[CurrentTurnIndex];
-}
-
 void ASchemeGameMode::FindAllStartLocations()
 {
 	TArray<AActor*> FoundActors;

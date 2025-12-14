@@ -90,7 +90,7 @@ void UInteractionComponent::TryPrimaryInteract()
 	}
 	if (ASchemePlayerController* PlayerController = Cast<ASchemePlayerController>(OwnerPawn->GetController()))
 	{
-		PlayerController->ServerRequestInteract(HoveredActor, OwnerPawn);
+		PlayerController->Server_RequestInteract(HoveredActor, OwnerPawn);
 		UE_LOG(LogTemp, Display, TEXT("Primary Interact Server Permission Requested By %s"), *OwnerPawn->GetName());
 	}
 }

@@ -6,6 +6,9 @@
 #include "GameFramework/PlayerController.h"
 #include "SchemePlayerController.generated.h"
 
+class ASchemePlayerState;
+class UActionDataAsset;
+struct FNotificationPacket;
 /**
  * 
  */
@@ -20,39 +23,36 @@ protected:
 	virtual void BeginPlay() override;
 	
 public:
-	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "Game System")
-	void SendGameStartRequestToServer();
 	
-	// Called on a client, runs on the server
-	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "Gold System")
-	void SendGoldIncomeRequestToServer(int32 Amount);
-	// Called on a client, runs on the server
-	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "Gold System")
-	void SendGoldOutcomeRequestToServer(int32 Amount);
+	// Called in server, works in clients
+	UFUNCTION(Client, Reliable, BlueprintCallable, Category = "Notification System")
+	void Client_ReceiveNotification(const FNotificationPacket& Notification);
 	
-	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "Action System")
-	void SendActionRequestToServer();
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Game System")
+	void ExecuteAction(UActionDataAsset* ActionData, ASchemePlayerController* TargetController);
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Game System")
+	void StartGame();
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Game System")
+	void Server_SendChallengeRequest();
 	
-	UFUNCTION(Client, Reliable, Category = "Game System")
-	void ClientReceiveActionNotification();
 	
-	// Called in clients, works in server
+	UFUNCTION(BlueprintCallable, Category = "Game System")
+	void EndTurn();
+	UFUNCTION(BlueprintCallable, Category = "Gold System")
+	void SendChangeGoldRequest(int32 Amount);
+	
 	UFUNCTION(Server, Reliable, Category = "Interaction")
-	void ServerRequestInteract(AActor* InteractActor, APawn* Interactor);
-
+	void Server_RequestInteract(AActor* InteractActor, APawn* Interactor);
 	UFUNCTION(Client, Reliable, Category = "Interaction")
-	void ClientInteractNotify(AActor* InteractActor, APawn* Interactor);
+	void Client_InteractNotify(AActor* InteractActor, APawn* Interactor);
 	
-	UFUNCTION(Client, Reliable, Category = "Game System")
-	void ClientReceiveStartGameNotification();
-
-	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "Turn System")
-	void SendServerFinishTurnRequest();
-	
-protected:
-	
-	UFUNCTION(BlueprintImplementableEvent, Category = "Game System")
+	// Handle UI when game starts
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Game System")
 	void OnReceiveStartGameNotification();
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Game System")
+	void OnReceiveChallengeNotification(const FText& Message);
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Game System")
+	void OnReceiveChallengeEndNotification(const FText& Message);
 	
 private:
 	/**
@@ -96,7 +96,8 @@ private:
 	float MaxYawLimit = 45.f;
 	UPROPERTY(EditDefaultsOnly, Category = "Movement Adjustments")
 	float MaxPitchLimit = 30.f;
-
+	
+	UPROPERTY()
 	USceneComponent* CameraRootComp;
 	
 	float CurrentYawDelta;

@@ -4,7 +4,21 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
+#include "Gameplay/Action/SchemeNotification.h"
 #include "SchemeGameMode.generated.h"
+
+class UActionDataAsset;
+class ASchemePlayerController;
+
+UENUM(BlueprintType)
+enum class EServerNotificationType : uint8
+{
+	ChallengeNotification,
+	TimeoutNotification,
+	GeneralNotification,
+	GameStartNotification,
+	GameEndNotification
+};
 
 /**
  * 
@@ -24,16 +38,21 @@ public:
 	// Called when a player leaves (Only on server)
 	virtual void Logout(AController* Exiting) override;
 	
-	UFUNCTION(Server, Reliable, Category = "Gold System")
-	void TryProcessGoldIncome(APlayerController* RequestingController, int32 Amount);
-	UFUNCTION(Server, Reliable, Category = "Gold System")
-	void TryProcessGoldOutcome(APlayerController* RequestingController, int32 Amount);
-
-	void ProcessPlayerAction(APlayerController* RequestingController);
+	// Process a player's action request
+	void ProcessPlayerAction(ASchemePlayerController* RequestingController, UActionDataAsset* ActionData, ASchemePlayerController* TargetController);
+	// Notify all players about a player's action
+	void BroadcastPlayerActionNotification(ASchemePlayerController* ActionDealer, ASchemePlayerController* ActionTarget, FNotificationPacket& Packet);
+	// Notify all players about timeout event
+	void BroadcastTimeoutNotification();
 	
-	void BroadcastPlayerActionNotification();
-
+	void BroadcastNotificationPacket(const FNotificationPacket& Packet);
+	
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
+	
+	void BreakTimeoutCountdown();
+	
+	UFUNCTION(BlueprintCallable)
+	void ProcessChallengeRequest();
 	
 	UFUNCTION(BlueprintCallable)
 	void CreateVirtualDeck();
@@ -78,13 +97,9 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void StartSchemeGame();
 
-	UFUNCTION(BlueprintCallable)
-	void AdvanceTurn();
-
 	UFUNCTION(BlueprintImplementableEvent)
 	void OnCanGameStartValid();
 private:
-	bool IsPlayersTurn(const APlayerController* PlayerController) const;
 	void FindAllStartLocations();
 private:
 	UPROPERTY(EditDefaultsOnly, Category = "Card System")
@@ -93,6 +108,9 @@ private:
 	TArray<class UCardDataAsset*> VirtualGameDeck;
 	UPROPERTY(EditDefaultsOnly, Category = "Card System")
 	TSubclassOf<class ACardActor> CardActorClass;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Notification System")
+	TMap<EServerNotificationType, TSubclassOf<USchemeNotification>> ServerNotificationMap;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Gameplay Adjustments")
 	int32 MinPlayer = 2;
@@ -109,6 +127,16 @@ private:
 
 	bool bCanGameStart = false;
 	bool bIsGameStarted = false;
+	
+	bool bChallengeRequest = false;
+	FTimerHandle ChallengeTimeoutHandle;
+	
+	UPROPERTY()
+	UActionDataAsset* CurrChallengeAction;
+	UPROPERTY()
+	ASchemePlayerController* CurrActionController;
+	UPROPERTY()
+	ASchemePlayerController* CurrTargetController;
 
 	int32 CurrentTurnIndex = 0;
 public:

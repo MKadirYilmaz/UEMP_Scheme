@@ -6,6 +6,8 @@
 #include "GameFramework/GameStateBase.h"
 #include "SchemeGameState.generated.h"
 
+class ASchemePlayerController;
+class ASchemePlayerState;
 /**
  * 
  */
@@ -24,6 +26,11 @@ public:
 	UFUNCTION()
 	void OnRep_PlayerTurnsOrder();
 
+	UFUNCTION(Server, Reliable, BlueprintCallable)
+	void Server_AdvanceToNextPlayerTurn(ASchemePlayerController* RequestingController);
+	UFUNCTION(Server, Reliable, BlueprintCallable)
+	void Server_ChangePlayerGoldCount(ASchemePlayerState* RequestingPlayerState, int32 Amount);
+	
 public:
 	UPROPERTY(ReplicatedUsing = OnRep_CurrentPlayerTurn, VisibleAnywhere, BlueprintReadOnly, Category = "Player Turn")
 	class APlayerState* CurrentPlayerTurn;

@@ -4,10 +4,13 @@
 #include "Player/SchemePlayerController.h"
 
 #include "SchemePlayerPawn.h"
-#include "Net/UnrealNetwork.h"
+#include "SchemePlayerState.h"
+
 #include "Framework/SchemeGameMode.h"
 #include "Framework/SchemeGameState.h"
-#include "GameFramework/PlayerState.h"
+
+#include "Gameplay/Action/SchemeNotification.h"
+
 #include "Interface/InteractableInterface.h"
 
 ASchemePlayerController::ASchemePlayerController()
@@ -36,20 +39,46 @@ void ASchemePlayerController::BeginPlay()
 	}
 }
 
-void ASchemePlayerController::ClientReceiveActionNotification_Implementation()
+void ASchemePlayerController::Client_ReceiveNotification_Implementation(const FNotificationPacket& Notification)
 {
-	UE_LOG(LogTemp, Display, TEXT("Client: Received Action Notification"));
+	if (Notification.NotificationType == nullptr)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Client %s: Received Notification with NULL Type!"), *GetName());
+		return;
+	}
+	
+	USchemeNotification* NotificationInstance = NewObject<USchemeNotification>(this, Notification.NotificationType);
+	if (!NotificationInstance) return;
+	
+	NotificationInstance->HandleNotification(this, Notification.NotificationMessage, 
+		Notification.NotificationAsset, Notification.NotificationObjects);
+	UE_LOG(LogTemp, Display, TEXT("Client %s: Notification Handled!"), *GetName());
 }
 
-void ASchemePlayerController::SendActionRequestToServer_Implementation()
+void ASchemePlayerController::Server_RequestInteract_Implementation(AActor* InteractActor, APawn* Interactor)
+{
+	UE_LOG(LogTemp, Display, TEXT("SERVER: Interact Requested By %s"), *Interactor->GetName());
+
+	IInteractableInterface::Execute_OnInteract(InteractActor, Interactor);
+	
+	// Notify client about successful interaction (for UI updates, etc.)
+	Client_InteractNotify(InteractActor, Interactor);
+}
+
+void ASchemePlayerController::Client_InteractNotify_Implementation(AActor* InteractActor, APawn* Interactor)
+{
+	IInteractableInterface::Execute_OnInteractionSuccessInClient(InteractActor, Interactor);
+}
+
+void ASchemePlayerController::ExecuteAction_Implementation(UActionDataAsset* ActionData, ASchemePlayerController* TargetController)
 {
 	if (ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>())
 	{
-		GameMode->ProcessPlayerAction(this);
+		GameMode->ProcessPlayerAction(this, ActionData, TargetController);
 	}
 }
 
-void ASchemePlayerController::SendGameStartRequestToServer_Implementation()
+void ASchemePlayerController::StartGame_Implementation()
 {
 	if (ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>())
 	{
@@ -57,58 +86,28 @@ void ASchemePlayerController::SendGameStartRequestToServer_Implementation()
 	}
 }
 
-void ASchemePlayerController::SendGoldOutcomeRequestToServer_Implementation(int32 Amount)
+void ASchemePlayerController::Server_SendChallengeRequest_Implementation()
 {
 	if (ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>())
 	{
-		GameMode->TryProcessGoldOutcome(this, Amount);
+		GameMode->ProcessChallengeRequest();
 	}
 }
 
-void ASchemePlayerController::SendGoldIncomeRequestToServer_Implementation(int32 Amount)
+void ASchemePlayerController::EndTurn()
 {
-	UE_LOG(LogTemp, Display, TEXT("Sending"));
-	if (ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>())
+	if (ASchemeGameState* SGS = Cast<ASchemeGameState>(GetWorld()->GetGameState()))
 	{
-		UE_LOG(LogTemp, Display, TEXT("CLIENT: Sending Gold Income Request to Server: %d"), Amount);
-		GameMode->TryProcessGoldIncome(this, Amount);
+		SGS->Server_AdvanceToNextPlayerTurn(this);
 	}
 }
 
-void ASchemePlayerController::ServerRequestInteract_Implementation(AActor* InteractActor, APawn* Interactor)
+void ASchemePlayerController::SendChangeGoldRequest(int32 Amount)
 {
-	UE_LOG(LogTemp, Display, TEXT("SERVER: Interact Requested By %s"), *Interactor->GetName());
-
-	IInteractableInterface::Execute_OnInteract(InteractActor, Interactor);
-	
-	ClientInteractNotify(InteractActor, Interactor);
-}
-
-void ASchemePlayerController::ClientInteractNotify_Implementation(AActor* InteractActor, APawn* Interactor)
-{
-	IInteractableInterface::Execute_OnInteractionSuccessInClient(InteractActor, Interactor);
-}
-
-void ASchemePlayerController::SendServerFinishTurnRequest_Implementation()
-{
-	ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>();
-	ASchemeGameState* SchemeGameState = Cast<ASchemeGameState>(GetWorld()->GetGameState());
-	if (GameMode && SchemeGameState)
+	if (ASchemeGameState* SGS = Cast<ASchemeGameState>(GetWorld()->GetGameState()))
 	{
-		if (SchemeGameState->CurrentPlayerTurn == PlayerState)
-		{
-			GameMode->AdvanceTurn();
-		}
-		else
-		{
-			UE_LOG(LogTemp, Error, TEXT("Turn is not your's to finish!"));
-		}
+		SGS->Server_ChangePlayerGoldCount(GetPlayerState<ASchemePlayerState>(), Amount);
 	}
-}
-
-void ASchemePlayerController::ClientReceiveStartGameNotification_Implementation()
-{
-	OnReceiveStartGameNotification();
 }
 
 void ASchemePlayerController::HandleClampedRotation(float MouseInputYaw, float MouseInputPitch)

@@ -81,6 +81,14 @@ void ASchemePlayerState::AddCardToHand(UCardDataAsset* NewCard)
 	HoldingCards.Add(NewCard);
 }
 
+void ASchemePlayerState::RemoveCardFromHand(class UCardDataAsset* CardToRemove)
+{
+	if (HoldingCards.Contains(CardToRemove))
+	{
+		HoldingCards.Remove(CardToRemove);
+	}
+}
+
 FTransform ASchemePlayerState::GetNextCardHoldingPoint()
 {
 	if (!CardTable)

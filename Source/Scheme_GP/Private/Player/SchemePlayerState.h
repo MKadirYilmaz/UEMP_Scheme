@@ -27,10 +27,11 @@ public:
 	bool RemoveGold(int32 amount);
 	// Do not call this function other than GameMode class
 	void AddCardToHand(class UCardDataAsset* NewCard);
+	// Do not call this function other than GameMode class
+	void RemoveCardFromHand(class UCardDataAsset* CardToRemove);
 
 	UFUNCTION(BlueprintPure, Category = "Gold")
 	FORCEINLINE int32 GetGold() const { return Gold; }
-
 	
 	UFUNCTION(BlueprintImplementableEvent, Category = "Gold")
 	void OnGoldChange(int32 NewGold, int32 Delta);
