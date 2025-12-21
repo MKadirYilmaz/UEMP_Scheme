@@ -34,12 +34,11 @@ void ASchemeGameState::OnRep_PlayerTurnsOrder()
 }
 
 void ASchemeGameState::Server_ChangePlayerGoldCount_Implementation(ASchemePlayerState* RequestingPlayerState,
-	int32 Amount)
+                                                                   int32 Amount)
 {
 	if (RequestingPlayerState != CurrentPlayerTurn)
 	{
-		// Send notification
-		UE_LOG(LogTemp, Display, TEXT("Not this player's turn to change gold!"));
+		UE_LOG(LogTemp, Error, TEXT("It's not this player's turn to change gold! GameState/ChangeGoldCount"));
 		return;
 	}
 	if (Amount > 0)

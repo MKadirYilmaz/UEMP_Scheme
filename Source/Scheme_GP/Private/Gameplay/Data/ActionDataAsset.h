@@ -7,14 +7,8 @@
 #include "ActionDataAsset.generated.h"
 
 class UBaseAction;
+class UCardDataAsset;
 
-UENUM(BlueprintType)
-enum class EActionTargetType : uint8
-{
-	Self            UMETA(DisplayName = "Self"),
-	SingleOpponent  UMETA(DisplayName = "Single Opponent"),
-	AllOpponents    UMETA(DisplayName = "All Opponents")
-};
 /**
  * 
  */
@@ -36,9 +30,12 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Action Rules")
 	bool bCanBeInterrupted;
 	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Action Rules")
-	EActionTargetType TargetType;
-	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Action Logic")
 	TSubclassOf<UBaseAction> ActionLogicClass;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Action Logic")
+	UCardDataAsset* RequiredCardToPerform;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Action Logic")
+	UCardDataAsset* BlockableByCard;
 };

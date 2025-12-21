@@ -8,7 +8,12 @@
 
 class ASchemePlayerState;
 class UActionDataAsset;
+class UCardDataAsset;
+class ACardTable;
+class ACardActor;
+
 struct FNotificationPacket;
+
 /**
  * 
  */
@@ -24,6 +29,8 @@ protected:
 	
 public:
 	
+	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+	
 	// Called in server, works in clients
 	UFUNCTION(Client, Reliable, BlueprintCallable, Category = "Notification System")
 	void Client_ReceiveNotification(const FNotificationPacket& Notification);
@@ -36,15 +43,27 @@ public:
 	void Server_SendChallengeRequest();
 	
 	
-	UFUNCTION(BlueprintCallable, Category = "Game System")
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Game System")
 	void EndTurn();
-	UFUNCTION(BlueprintCallable, Category = "Gold System")
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Gold System")
 	void SendChangeGoldRequest(int32 Amount);
 	
 	UFUNCTION(Server, Reliable, Category = "Interaction")
 	void Server_RequestInteract(AActor* InteractActor, APawn* Interactor);
 	UFUNCTION(Client, Reliable, Category = "Interaction")
 	void Client_InteractNotify(AActor* InteractActor, APawn* Interactor);
+	
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Card System")
+	void Server_AddCardToHand(ACardActor* NewCard);
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Card System")
+	void Server_RemoveCardFromHand(UCardDataAsset* CardToRemove);
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Card System")
+	void Server_RemoveRandomCardFromHand();
+	
+	UFUNCTION(BlueprintPure, Category = "Card System")
+	bool HasCardInHand(const UCardDataAsset* CardToCheck) const;
+	UFUNCTION(BlueprintPure, Category = "Card System")
+	bool HasAnyCardInHand() const;
 	
 	// Handle UI when game starts
 	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Game System")
@@ -53,6 +72,18 @@ public:
 	void OnReceiveChallengeNotification(const FText& Message);
 	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Game System")
 	void OnReceiveChallengeEndNotification(const FText& Message);
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Game System")
+	void OnReceiveGeneralNotification(const FText& Message);
+	
+	UFUNCTION(BlueprintCallable)
+	void PrintHoldingCards() const;
+	
+	UFUNCTION()
+	void OnRep_HoldingCards() const;
+	
+	int32 GetFirstEmptyCardHoldingPointIndex() const;
+	FTransform GetCardHoldingPoint(int32 Index) const;
+	//void SetHoldingPointState(int32 Index, bool bIsUsed);
 	
 private:
 	/**
@@ -96,6 +127,14 @@ private:
 	float MaxYawLimit = 45.f;
 	UPROPERTY(EditDefaultsOnly, Category = "Movement Adjustments")
 	float MaxPitchLimit = 30.f;
+	
+	UPROPERTY(ReplicatedUsing = OnRep_HoldingCards, VisibleAnywhere, Category = "Card System")
+	TArray<ACardActor*> HoldingCards;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Card System")
+    TSubclassOf<ACardTable> CardTableClass;
+    UPROPERTY()
+    ACardTable* CardTable;
 	
 	UPROPERTY()
 	USceneComponent* CameraRootComp;

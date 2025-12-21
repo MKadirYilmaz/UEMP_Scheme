@@ -3,6 +3,8 @@
 
 #include "Player/SchemePlayerController.h"
 
+#include "Net/UnrealNetwork.h"
+
 #include "SchemePlayerPawn.h"
 #include "SchemePlayerState.h"
 
@@ -10,8 +12,12 @@
 #include "Framework/SchemeGameState.h"
 
 #include "Gameplay/Action/SchemeNotification.h"
+#include "Gameplay/Data/CardDataAsset.h"
+#include "Gameplay/Actors/CardTable.h"
+#include "Gameplay/Actors/CardActor.h"
 
 #include "Interface/InteractableInterface.h"
+#include "Kismet/GameplayStatics.h"
 
 ASchemePlayerController::ASchemePlayerController()
 {
@@ -21,7 +27,12 @@ ASchemePlayerController::ASchemePlayerController()
 void ASchemePlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+	
+	HoldingCards.SetNum(2);
+	OnRep_HoldingCards();
 
+	CardTable = Cast<ACardTable>(UGameplayStatics::GetActorOfClass(this, CardTableClass));
+	
 	if (IsLocalController())
 	{
 		if (HasAuthority())
@@ -37,6 +48,13 @@ void ASchemePlayerController::BeginPlay()
 	{
 		UE_LOG(LogTemp, Display, TEXT("(REMOTE) Other player's controller %s"), *GetName());
 	}
+}
+
+void ASchemePlayerController::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	
+	DOREPLIFETIME(ASchemePlayerController, HoldingCards);
 }
 
 void ASchemePlayerController::Client_ReceiveNotification_Implementation(const FNotificationPacket& Notification)
@@ -94,7 +112,7 @@ void ASchemePlayerController::Server_SendChallengeRequest_Implementation()
 	}
 }
 
-void ASchemePlayerController::EndTurn()
+void ASchemePlayerController::EndTurn_Implementation()
 {
 	if (ASchemeGameState* SGS = Cast<ASchemeGameState>(GetWorld()->GetGameState()))
 	{
@@ -102,12 +120,144 @@ void ASchemePlayerController::EndTurn()
 	}
 }
 
-void ASchemePlayerController::SendChangeGoldRequest(int32 Amount)
+void ASchemePlayerController::SendChangeGoldRequest_Implementation(int32 Amount)
 {
 	if (ASchemeGameState* SGS = Cast<ASchemeGameState>(GetWorld()->GetGameState()))
 	{
 		SGS->Server_ChangePlayerGoldCount(GetPlayerState<ASchemePlayerState>(), Amount);
 	}
+}
+
+void ASchemePlayerController::Server_AddCardToHand_Implementation(ACardActor* NewCard)
+{
+	for (int32 i = 0; i < HoldingCards.Num(); i++)
+	{
+		// Look for an empty slot
+		if (HoldingCards[i]) continue;
+		
+		// Found an empty slot
+		HoldingCards[i] = NewCard;
+		OnRep_HoldingCards();
+		return;
+	}
+	// No empty slot found
+	UE_LOG(LogTemp, Error, TEXT("No empty slot to add the new card in hand!"));
+}
+
+void ASchemePlayerController::Server_RemoveCardFromHand_Implementation(UCardDataAsset* CardToRemove)
+{
+	// Player should put the card in the game mode deck and shuffle it
+	for (int32 i = 0; i < HoldingCards.Num(); i++)
+	{
+		if (!HoldingCards[i]) continue;
+		if (HoldingCards[i]->GetCardData()->GetCardRole() == CardToRemove->GetCardRole())
+		{
+			if (ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>())
+			{
+				GameMode->ReturnCardToDeck(HoldingCards[i]);
+			}
+			else return;
+			HoldingCards[i] = nullptr;
+			OnRep_HoldingCards();
+			return;
+		}
+	}
+	UE_LOG(LogTemp, Error, TEXT("The card is not in your hand!"));
+}
+
+void ASchemePlayerController::Server_RemoveRandomCardFromHand_Implementation()
+{
+	// Player should put the card in the game mode deck and shuffle it
+	if (HoldingCards.IsEmpty())
+	{
+		UE_LOG(LogTemp, Error, TEXT("No cards in hand to remove!"));
+		return;
+	}
+	// Create a temporary array of real cards (non-null)
+	TArray<ACardActor*> RealCards;
+	for (int32 i = 0; i < HoldingCards.Num(); i++)
+	{
+		if (HoldingCards[i])
+		{
+			RealCards.Add(HoldingCards[i]);
+		}
+	}
+	// Select a random index from the real cards
+	int32 RandomIndex = FMath::RandRange(0, RealCards.Num() - 1);
+	if (ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>())
+	{
+		ACardActor* CardToReturn = RealCards[RandomIndex];
+		GameMode->ReturnCardToDeck(CardToReturn);
+	}
+	HoldingCards.RemoveAt(RandomIndex);
+	OnRep_HoldingCards();
+}
+
+bool ASchemePlayerController::HasCardInHand(const UCardDataAsset* CardToCheck) const
+{
+	if (!CardToCheck)
+	{
+		UE_LOG(LogTemp, Error, TEXT("CardToCheck pointer is NULL!"));
+		return true;
+	}
+	for (const ACardActor* HeldCard : HoldingCards)
+	{
+		if (!HeldCard) continue;
+		if (HeldCard->GetCardData()->GetCardRole() == CardToCheck->GetCardRole())
+			return true;
+	}
+	return false;
+	
+}
+
+bool ASchemePlayerController::HasAnyCardInHand() const
+{
+	for (const ACardActor* HeldCard : HoldingCards)
+	{
+		if (HeldCard)
+			return true;
+	}
+	return false;
+}
+
+void ASchemePlayerController::PrintHoldingCards() const
+{
+	for (const ACardActor* HeldCard : HoldingCards)
+	{
+		if (!HeldCard) continue;
+		UE_LOG(LogTemp, Display, TEXT("Client %s: Holding Card: %s"), *GetName(), *HeldCard->GetCardData()->GetCardName().ToString());
+	}
+}
+
+void ASchemePlayerController::OnRep_HoldingCards() const
+{
+	UE_LOG(LogTemp, Display, TEXT("Client %s: HoldingCards Replicated, Num of Cards: %d"),
+		*GetName(), HoldingCards.Num());
+}
+
+int32 ASchemePlayerController::GetFirstEmptyCardHoldingPointIndex() const
+{
+	if (!CardTable) return -1;
+
+	for (int32 i = 0; i < HoldingCards.Num(); i++)
+	{
+		if (!HoldingCards[i])
+			return i;
+	}
+	return -1;
+}
+
+FTransform ASchemePlayerController::GetCardHoldingPoint(int32 Index) const
+{
+	if (!CardTable || Index < 0) return FTransform();
+
+	if (ASchemePlayerState* SchemePlayerState = GetPlayerState<ASchemePlayerState>(); !SchemePlayerState) return FTransform();
+	
+	int32 PlayerIndex = GetPlayerState<ASchemePlayerState>()->GetPlayerIndex();
+	
+	if (PlayerIndex >= CardTable->GetCardPointsStructs().Num() || Index >= CardTable->GetCardPointsStructs()[PlayerIndex].CardTransforms.Num())
+		return FTransform();
+	return CardTable->GetCardPointsStructs()[PlayerIndex].CardTransforms[Index];
 }
 
 void ASchemePlayerController::HandleClampedRotation(float MouseInputYaw, float MouseInputPitch)

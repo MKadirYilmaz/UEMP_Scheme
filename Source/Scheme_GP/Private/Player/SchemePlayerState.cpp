@@ -11,10 +11,6 @@
 void ASchemePlayerState::BeginPlay()
 {
 	Super::BeginPlay();
-	if (AActor* TableActor = UGameplayStatics::GetActorOfClass(this, CardTableClass))
-	{
-		CardTable = Cast<ACardTable>(TableActor);
-	}
 }
 
 ASchemePlayerState::ASchemePlayerState()
@@ -27,7 +23,6 @@ void ASchemePlayerState::GetLifetimeReplicatedProps(TArray<class FLifetimeProper
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(ASchemePlayerState, Gold);
-	DOREPLIFETIME(ASchemePlayerState, HoldingCards);
 	DOREPLIFETIME(ASchemePlayerState, PlayerIndex);
 }
 
@@ -76,43 +71,11 @@ bool ASchemePlayerState::RemoveGold(int32 amount)
 	return true;
 }
 
-void ASchemePlayerState::AddCardToHand(UCardDataAsset* NewCard)
-{
-	HoldingCards.Add(NewCard);
-}
-
-void ASchemePlayerState::RemoveCardFromHand(class UCardDataAsset* CardToRemove)
-{
-	if (HoldingCards.Contains(CardToRemove))
-	{
-		HoldingCards.Remove(CardToRemove);
-	}
-}
-
-FTransform ASchemePlayerState::GetNextCardHoldingPoint()
-{
-	if (!CardTable)
-		return FTransform();
-	if (PlayerIndex >= CardTable->GetCardPointsStructs().Num() || CardHoldingPointIndex >= CardTable->GetCardPointsStructs()[PlayerIndex].CardTransforms.Num())
-		return FTransform();
-	FTransform& Transform = CardTable->GetCardPointsStructs()[PlayerIndex].CardTransforms[CardHoldingPointIndex];
-	CardHoldingPointIndex++;
-	return Transform;
-}
-
 void ASchemePlayerState::OnRep_Gold()
 {
 	// Called automatically in clients when the gold value has changed.
 
 	OnGoldChange(Gold, CachedDelta);
-}
-
-void ASchemePlayerState::OnRep_HoldingCards()
-{
-	// Called automatically in clients when the holding cards have changed.
-
-	OnCardChange(HoldingCards);
-	UE_LOG(LogTemp, Display, TEXT("Holding Cards Have Changed In: %s"), *GetName());
 }
 
 void ASchemePlayerState::OnRep_PlayerIndex()

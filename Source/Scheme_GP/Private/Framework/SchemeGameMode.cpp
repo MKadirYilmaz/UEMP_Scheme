@@ -14,6 +14,7 @@
 #include "Gameplay/Actors/CardActor.h"
 #include "Gameplay/Action/BaseAction.h"
 #include "Gameplay/Data/ActionDataAsset.h"
+#include "Gameplay/Data/CardDataAsset.h"
 
 
 void ASchemeGameMode::BeginPlay()
@@ -64,7 +65,13 @@ void ASchemeGameMode::Logout(AController* Exiting)
 void ASchemeGameMode::ProcessPlayerAction(ASchemePlayerController* RequestingController, UActionDataAsset* ActionData, ASchemePlayerController* TargetController)
 {
 	// Process any server-side logic for the player's action here
-	if (!ActionData || !ActionData->ActionLogicClass) return;
+	if (!ActionData || !ActionData->ActionLogicClass || !RequestingController) return;
+	
+	if (RequestingController->GetPlayerState<ASchemePlayerState>() != GetGameState<ASchemeGameState>()->CurrentPlayerTurn)
+	{
+		SendGeneralNotificationToPlayer(RequestingController, FText::FromString("It's not your turn to perform an action."));
+		return;
+	}
 	
 	UBaseAction* ActionInstance = NewObject<UBaseAction>(this, ActionData->ActionLogicClass);
 	
@@ -160,6 +167,15 @@ void ASchemeGameMode::BroadcastNotificationPacket(const FNotificationPacket& Pac
 	}
 }
 
+void ASchemeGameMode::SendGeneralNotificationToPlayer(ASchemePlayerController* TargetPlayer, const FText& Message)
+{
+	FNotificationPacket Packet = {
+		ServerNotificationMap.Find(EServerNotificationType::GeneralNotification)->Get(),
+		Message
+	};
+	TargetPlayer->Client_ReceiveNotification(Packet);
+}
+
 AActor* ASchemeGameMode::ChoosePlayerStart_Implementation(AController* Player)
 {
 	if (PlayerStartLocations.IsEmpty())
@@ -192,19 +208,45 @@ void ASchemeGameMode::ProcessChallengeRequest()
 		UE_LOG(LogTemp, Error, TEXT("No current challenge action or action controller set!"));
 		return;
 	}
-	// Determine who won the challenge (for simplicity, we'll assume the action always succeeds here)
-	
 	BreakTimeoutCountdown();
-	
+	// Determine who won the challenge (for simplicity, we'll assume the action always succeeds here)
 	FNotificationPacket Packet = {
 		ServerNotificationMap.Find(EServerNotificationType::GeneralNotification)->Get(),
-		FText::FromString("The challenge has been resolved."),
+		FText(),
 		CurrChallengeAction
 	};
+	
+	bool ChallengeResult = CurrActionController->HasCardInHand(CurrChallengeAction->RequiredCardToPerform);
+	Packet.NotificationMessage = (ChallengeResult) ? FText::FromString(" The action succeeds as the required card is present. Challenge failed.")
+		: FText::FromString(" The action fails as the required card is absent. Challenge succeeded.");
+	
 	BroadcastNotificationPacket(Packet);
-	UBaseAction* ActionInstance = NewObject<UBaseAction>(this, CurrChallengeAction->ActionLogicClass);
-	if (!ActionInstance) return;
-	ActionInstance->ExecuteAction(CurrActionController, CurrTargetController);
+	
+	if (ChallengeResult)
+	{
+		UBaseAction* ActionInstance = NewObject<UBaseAction>(this, CurrChallengeAction->ActionLogicClass);
+		if (!ActionInstance) return;
+		ActionInstance->ExecuteAction(CurrActionController, CurrTargetController);
+		
+		// Since the all player know the card exist in the action dealer's hand, remove it
+		CurrActionController->Server_RemoveCardFromHand(CurrChallengeAction->RequiredCardToPerform);
+		// Then draw a new card to replace it
+		DrawCard(CurrActionController, CurrActionController->GetFirstEmptyCardHoldingPointIndex());
+		
+		// Punish the challenger
+	}
+	else
+	{
+		if (CurrActionController->HasAnyCardInHand())
+		{
+			CurrActionController->Server_RemoveRandomCardFromHand();
+		}
+		else
+		{
+			SendGeneralNotificationToPlayer(CurrActionController, FText::FromString("You have no cards left to remove!"));
+			// Action dealer lose the game
+		}
+	}
 }
 
 void ASchemeGameMode::CreateVirtualDeck()
@@ -244,31 +286,53 @@ void ASchemeGameMode::DealInitialCards(int32 CardsPerPlayer)
 	for (APlayerController* PlayerController : CurrentPlayers)
 	{
 		PlayerStates.Add(PlayerController->PlayerState);
+		
+		ASchemePlayerController* SchemePlayerController = Cast<ASchemePlayerController>(PlayerController);
+		if (!SchemePlayerController) continue;
+		
+		for (int32 i = 0; i < CardsPerPlayer; i++)
+		{
+			DrawCard(SchemePlayerController, SchemePlayerController->GetFirstEmptyCardHoldingPointIndex());
+		}
+		
 	}
 	UE_LOG(LogTemp, Display, TEXT("%s: Num of Player In The Game: %d"), (HasAuthority()) ? TEXT("SERVER") : TEXT("CLIENT"), GetNumPlayers());
-	for (int32 i = 0; i < CardsPerPlayer; i++)
-	{
-		for (APlayerState* PlayerState : PlayerStates)
-		{
-			ASchemePlayerState* SchemePlayerState = Cast<ASchemePlayerState>(PlayerState);
-			if (!SchemePlayerState) continue;
-				DrawCard(SchemePlayerState);
-		}
-	}
+	
 }
 
-void ASchemeGameMode::DrawCard(ASchemePlayerState* PlayerState)
+void ASchemeGameMode::DrawCard(ASchemePlayerController* PlayerController, int32 HoldIndex)
 {
+	if (!PlayerController || HoldIndex == -1 || VirtualGameDeck.Num() == 0) return;
+	
+	ASchemePlayerState* PlayerState = PlayerController->GetPlayerState<ASchemePlayerState>();
 	if (!PlayerState) return;
-	if (VirtualGameDeck.Num() == 0) return;
-	UCardDataAsset* Card = VirtualGameDeck.Pop();
 
-	// Add Virtual Card
-	PlayerState->AddCardToHand(Card);
+	UCardDataAsset* Card = VirtualGameDeck.Pop();
 	// Spawn Visual Actor
-	FTransform SpawnTransform = PlayerState->GetNextCardHoldingPoint();
+	FTransform SpawnTransform = PlayerController->GetCardHoldingPoint(PlayerController->GetFirstEmptyCardHoldingPointIndex());
+	
 	ACardActor* SpawnedCard = GetWorld()->SpawnActor<ACardActor>(CardActorClass, SpawnTransform.GetLocation(), SpawnTransform.GetRotation().Rotator());
 	SpawnedCard->SetCardData(Card);
+	
+	// Add Virtual Card
+	PlayerController->Server_AddCardToHand(SpawnedCard);
+	
+}
+
+void ASchemeGameMode::ReturnCardToDeck(AActor* CardToReturn)
+{
+	if (!CardToReturn) return;
+	ACardActor* CardActor = Cast<ACardActor>(CardToReturn);
+	if (!CardActor) return;
+	
+	UCardDataAsset* CardData = CardActor->GetCardData();
+	if (!CardData) return;
+	
+	VirtualGameDeck.Add(CardData);
+	
+	ShuffleDeck();
+	
+	CardToReturn->Destroy();
 }
 
 void ASchemeGameMode::StartSchemeGame()

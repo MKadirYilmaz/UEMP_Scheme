@@ -25,37 +25,19 @@ public:
 	void AddGold(int32 amount);
 	// Do not call this function other than GameMode class
 	bool RemoveGold(int32 amount);
-	// Do not call this function other than GameMode class
-	void AddCardToHand(class UCardDataAsset* NewCard);
-	// Do not call this function other than GameMode class
-	void RemoveCardFromHand(class UCardDataAsset* CardToRemove);
-
 	UFUNCTION(BlueprintPure, Category = "Gold")
 	FORCEINLINE int32 GetGold() const { return Gold; }
 	
 	UFUNCTION(BlueprintImplementableEvent, Category = "Gold")
 	void OnGoldChange(int32 NewGold, int32 Delta);
-	UFUNCTION(BlueprintImplementableEvent, Category = "Card")
-	void OnCardChange(const TArray<class UCardDataAsset*>& NewCards);
 
-	FTransform GetNextCardHoldingPoint();
 protected:
-	UPROPERTY(EditDefaultsOnly, Category = "Card")
-	TArray<USceneComponent*> CardHoldingPoints;
-	UPROPERTY(EditDefaultsOnly, Category = "Card System")
-	TSubclassOf<class AActor> CardTableClass;
-
-	UPROPERTY()
-	class ACardTable* CardTable;
 
 	UPROPERTY(ReplicatedUsing = OnRep_PlayerIndex, VisibleAnywhere)
 	int32 PlayerIndex = 0;
-	int32 CardHoldingPointIndex = 0;
 	
 	UPROPERTY(ReplicatedUsing = OnRep_Gold, VisibleAnywhere, Category = "Gold")
 	int32 Gold = 0;
-	UPROPERTY(ReplicatedUsing = OnRep_HoldingCards, VisibleAnywhere, Category = "Card")
-	TArray<class UCardDataAsset*> HoldingCards;
 
 	int32 CachedDelta = 0;
 	
@@ -64,11 +46,9 @@ protected:
 	void OnRep_Gold();
 	// Called only on clients when the value has changed
 	UFUNCTION()
-	void OnRep_HoldingCards();
-	// Called only on clients when the value has changed
-	UFUNCTION()
 	void OnRep_PlayerIndex();
 
 public:
 	FORCEINLINE void SetPlayerIndex(int32 NewIndex) { PlayerIndex = NewIndex; }
+	FORCEINLINE int32 GetPlayerIndex() const { return PlayerIndex; }
 };

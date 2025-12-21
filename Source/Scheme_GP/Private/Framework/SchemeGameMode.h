@@ -9,6 +9,9 @@
 
 class UActionDataAsset;
 class ASchemePlayerController;
+class ACardActor;
+class UCardDataAsset;
+class APlayerStart;
 
 UENUM(BlueprintType)
 enum class EServerNotificationType : uint8
@@ -19,6 +22,7 @@ enum class EServerNotificationType : uint8
 	GameStartNotification,
 	GameEndNotification
 };
+
 
 /**
  * 
@@ -46,6 +50,8 @@ public:
 	void BroadcastTimeoutNotification();
 	
 	void BroadcastNotificationPacket(const FNotificationPacket& Packet);
+	
+	void SendGeneralNotificationToPlayer(ASchemePlayerController* TargetPlayer, const FText& Message);
 	
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 	
@@ -92,7 +98,10 @@ public:
 	void DealInitialCards(int32 CardsPerPlayer);
 	
 	UFUNCTION(BlueprintCallable)
-	void DrawCard(class ASchemePlayerState* PlayerState);
+	void DrawCard(ASchemePlayerController* PlayerController, int32 HoldIndex);
+	UFUNCTION(BlueprintCallable)
+	void ReturnCardToDeck(AActor* CardToReturn);
+	
 	
 	UFUNCTION(BlueprintCallable)
 	void StartSchemeGame();
@@ -103,11 +112,11 @@ private:
 	void FindAllStartLocations();
 private:
 	UPROPERTY(EditDefaultsOnly, Category = "Card System")
-	TArray<class UCardDataAsset*> AllCardDataTypes;
+	TArray<UCardDataAsset*> AllCardDataTypes;
 	UPROPERTY(VisibleAnywhere, Category = "Card System")
-	TArray<class UCardDataAsset*> VirtualGameDeck;
+	TArray<UCardDataAsset*> VirtualGameDeck;
 	UPROPERTY(EditDefaultsOnly, Category = "Card System")
-	TSubclassOf<class ACardActor> CardActorClass;
+	TSubclassOf<ACardActor> CardActorClass;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Notification System")
 	TMap<EServerNotificationType, TSubclassOf<USchemeNotification>> ServerNotificationMap;
@@ -123,7 +132,7 @@ private:
 	UPROPERTY()
 	TArray<APlayerController*> CurrentPlayers;
 	UPROPERTY(VisibleAnywhere, Category = "Spawn System")
-	TArray<class APlayerStart*> PlayerStartLocations;
+	TArray<APlayerStart*> PlayerStartLocations;
 
 	bool bCanGameStart = false;
 	bool bIsGameStarted = false;
