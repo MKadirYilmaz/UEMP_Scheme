@@ -62,100 +62,6 @@ void ASchemeGameMode::Logout(AController* Exiting)
 	UE_LOG(LogTemp, Display, TEXT("Player Has Left! %s"), *Exiting->GetName());
 }
 
-void ASchemeGameMode::ProcessPlayerAction(ASchemePlayerController* RequestingController, UActionDataAsset* ActionData, ASchemePlayerController* TargetController)
-{
-	// Process any server-side logic for the player's action here
-	if (!ActionData || !ActionData->ActionLogicClass || !RequestingController) return;
-	
-	if (RequestingController->GetPlayerState<ASchemePlayerState>() != GetGameState<ASchemeGameState>()->CurrentPlayerTurn)
-	{
-		SendGeneralNotificationToPlayer(RequestingController, FText::FromString("It's not your turn to perform an action."));
-		return;
-	}
-	
-	UBaseAction* ActionInstance = NewObject<UBaseAction>(this, ActionData->ActionLogicClass);
-	
-	if (!ActionInstance) return;
-	
-	// Notify all players about the action being performed
-	if (ActionData->bCanBeInterrupted)
-	{
-		
-		CurrChallengeAction = ActionData;
-		CurrActionController = RequestingController;
-		CurrTargetController = TargetController;
-		
-		FNotificationPacket Packet = {
-			ServerNotificationMap.Find(EServerNotificationType::ChallengeNotification)->Get(),
-			FText(),
-			ActionData
-		};
-		BroadcastPlayerActionNotification(RequestingController, TargetController, Packet);
-		// Extra protection against multiple timers
-		if (ChallengeTimeoutHandle.IsValid())
-		{
-			GetWorldTimerManager().ClearTimer(ChallengeTimeoutHandle);
-		}
-		// Last timer is now unusable, recreate it
-		ChallengeTimeoutHandle = FTimerHandle{};
-		// Wait for challenge responses before executing the action
-		GetWorld()->GetTimerManager().SetTimer(ChallengeTimeoutHandle, this, &ASchemeGameMode::BroadcastTimeoutNotification, 10.0f, false);
-		
-	}
-	// Execute the action immediately
-	else
-	{
-		FNotificationPacket Packet = {
-			ServerNotificationMap.Find(EServerNotificationType::GeneralNotification)->Get(),
-			FText::FromString("An action has been executed."),
-			ActionData
-		};
-
-		BroadcastNotificationPacket(Packet);
-		ActionInstance->ExecuteAction(RequestingController, TargetController);
-	}
-}
-
-void ASchemeGameMode::BroadcastPlayerActionNotification(ASchemePlayerController* ActionDealer, ASchemePlayerController* ActionTarget, FNotificationPacket& Packet)
-{
-	for (APlayerController* PlayerController : CurrentPlayers)
-	{
-		ASchemePlayerController* SchemePlayerController = Cast<ASchemePlayerController>(PlayerController);
-		if (!SchemePlayerController || SchemePlayerController == ActionDealer) continue;
-		
-		if (SchemePlayerController == ActionTarget)
-		{
-			Packet.NotificationMessage = FText::FromString("You are being targeted by an action!");
-			SchemePlayerController->Client_ReceiveNotification(Packet);
-		}
-		else
-		{
-			Packet.NotificationMessage = FText::FromString("Another player is being targeted by an action!");
-			SchemePlayerController->Client_ReceiveNotification(Packet);
-		}
-	}
-}
-
-void ASchemeGameMode::BroadcastTimeoutNotification()
-{
-	for (APlayerController* PlayerController : CurrentPlayers)
-	{
-		FNotificationPacket Packet = {
-			ServerNotificationMap.Find(EServerNotificationType::TimeoutNotification)->Get(),
-			FText::FromString("The action challenge period has timed out.")
-		};
-		ASchemePlayerController* SchemePlayerController = Cast<ASchemePlayerController>(PlayerController);
-		if (!SchemePlayerController) continue;
-		
-		SchemePlayerController->Client_ReceiveNotification(Packet);
-	}
-	
-	// Execute the action since the challenge period has ended
-	UBaseAction* ActionInstance = NewObject<UBaseAction>(this, CurrChallengeAction->ActionLogicClass);
-	if (!ActionInstance) return;
-	ActionInstance->ExecuteAction(CurrActionController, CurrTargetController);
-}
-
 void ASchemeGameMode::BroadcastNotificationPacket(const FNotificationPacket& Packet)
 {
 	for (APlayerController* PlayerController : CurrentPlayers)
@@ -189,66 +95,6 @@ AActor* ASchemeGameMode::ChoosePlayerStart_Implementation(AController* Player)
 	UE_LOG(LogTemp, Error, TEXT("Player Start Couldn't Found!"));
 	return Super::ChoosePlayerStart_Implementation(Player);
 }
-
-void ASchemeGameMode::BreakTimeoutCountdown()
-{
-	GetWorldTimerManager().ClearTimer(ChallengeTimeoutHandle);
-	
-	FNotificationPacket Packet = {
-		ServerNotificationMap.Find(EServerNotificationType::TimeoutNotification)->Get(),
-		FText::FromString("Someone challenged the action!"),
-	};
-	BroadcastNotificationPacket(Packet);
-}
-
-void ASchemeGameMode::ProcessChallengeRequest()
-{
-	if (!CurrChallengeAction || !CurrActionController)
-	{
-		UE_LOG(LogTemp, Error, TEXT("No current challenge action or action controller set!"));
-		return;
-	}
-	BreakTimeoutCountdown();
-	// Determine who won the challenge (for simplicity, we'll assume the action always succeeds here)
-	FNotificationPacket Packet = {
-		ServerNotificationMap.Find(EServerNotificationType::GeneralNotification)->Get(),
-		FText(),
-		CurrChallengeAction
-	};
-	
-	bool ChallengeResult = CurrActionController->HasCardInHand(CurrChallengeAction->RequiredCardToPerform);
-	Packet.NotificationMessage = (ChallengeResult) ? FText::FromString(" The action succeeds as the required card is present. Challenge failed.")
-		: FText::FromString(" The action fails as the required card is absent. Challenge succeeded.");
-	
-	BroadcastNotificationPacket(Packet);
-	
-	if (ChallengeResult)
-	{
-		UBaseAction* ActionInstance = NewObject<UBaseAction>(this, CurrChallengeAction->ActionLogicClass);
-		if (!ActionInstance) return;
-		ActionInstance->ExecuteAction(CurrActionController, CurrTargetController);
-		
-		// Since the all player know the card exist in the action dealer's hand, remove it
-		CurrActionController->Server_RemoveCardFromHand(CurrChallengeAction->RequiredCardToPerform);
-		// Then draw a new card to replace it
-		DrawCard(CurrActionController, CurrActionController->GetFirstEmptyCardHoldingPointIndex());
-		
-		// Punish the challenger
-	}
-	else
-	{
-		if (CurrActionController->HasAnyCardInHand())
-		{
-			CurrActionController->Server_RemoveRandomCardFromHand();
-		}
-		else
-		{
-			SendGeneralNotificationToPlayer(CurrActionController, FText::FromString("You have no cards left to remove!"));
-			// Action dealer lose the game
-		}
-	}
-}
-
 void ASchemeGameMode::CreateVirtualDeck()
 {
 	VirtualGameDeck.Empty();
@@ -366,6 +212,7 @@ void ASchemeGameMode::StartSchemeGame()
 		}
 	}
 }
+
 void ASchemeGameMode::FindAllStartLocations()
 {
 	TArray<AActor*> FoundActors;
@@ -384,4 +231,255 @@ void ASchemeGameMode::FindAllStartLocations()
 				PlayerStartLocations[i] = PlayerStart;
 		}
 	}
+}
+
+
+void ASchemeGameMode::ProcessActionRequest(ASchemePlayerController* InstigatorController, UActionDataAsset* ActionData,
+	ASchemePlayerController* Target)
+{
+	if (CurrentPhase != EGamePhase::Idle)
+	{
+		SendGeneralNotificationToPlayer(InstigatorController, FText::FromString("Cannot perform action right now."));
+		return;
+	}
+	
+	CurrentContext.Reset();
+	CurrentContext.InstigatorCont = InstigatorController;
+	CurrentContext.Target = Target;
+	CurrentContext.ActionData = ActionData;
+	
+	if (!ActionData->RequiredCardToPerform && !ActionData->BlockableByCard)
+	{
+		// No challenge or block possible, execute immediately
+		ExecuteCurrentAction();
+	}
+	else
+	{
+		SetGamePhase(EGamePhase::ActionReaction);
+	}
+}
+
+void ASchemeGameMode::ProcessChallengeRequest(ASchemePlayerController* Challenger)
+{
+	// Only allow challenges during reaction phases
+	if (CurrentPhase != EGamePhase::ActionReaction && CurrentPhase != EGamePhase::BlockReaction) return;
+	
+	// Prevent self-challenge
+	if (Challenger == CurrentContext.InstigatorCont) return;
+	
+	// Stop the phase timer
+	GetWorldTimerManager().ClearTimer(PhaseTimerHandle);
+	
+	if (CurrentPhase == EGamePhase::ActionReaction)
+	{
+		BroadcastNotificationPacket(
+			FNotificationPacket{ServerNotificationMap.Find(EServerNotificationType::TimeoutNotification)->Get(),
+			FText::FromString("An action challenge has been declared.")}
+		);
+		
+		AutoResolveChallenge(CurrentContext.InstigatorCont, Challenger, CurrentContext.ActionData->RequiredCardToPerform);
+	}
+	else if (CurrentPhase == EGamePhase::BlockReaction)
+	{
+		BroadcastNotificationPacket(
+			FNotificationPacket{ServerNotificationMap.Find(EServerNotificationType::TimeoutNotification)->Get(),
+			FText::FromString("A block challenge has been declared.")}
+		);
+		
+		AutoResolveChallenge(CurrentContext.Blocker, Challenger, CurrentContext.ActionData->BlockableByCard);
+	}
+	
+	// Move to processing phase
+	CurrentPhase = EGamePhase::Processing;
+}
+
+void ASchemeGameMode::ProcessBlockRequest(ASchemePlayerController* Blocker)
+{
+	if (CurrentPhase != EGamePhase::ActionReaction) return;
+	
+	// If the action is not blockable, ignore the block request
+	if (!CurrentContext.ActionData->BlockableByCard) return;
+	
+	CurrentContext.Blocker = Blocker;
+	// CurrentContext.ClaimedBlockCard = BlockCard;
+	
+	BroadcastNotificationPacket(
+		FNotificationPacket{ServerNotificationMap.Find(EServerNotificationType::TimeoutNotification)->Get(),
+		FText::FromString("An action block has been declared.")}
+	);
+	
+	SetGamePhase(EGamePhase::BlockReaction);
+}
+
+void ASchemeGameMode::ExecuteCurrentAction()
+{
+	if (CurrentContext.ActionData && CurrentContext.ActionData->ActionLogicClass)
+	{
+		UBaseAction* ActionInstance = NewObject<UBaseAction>(this, CurrentContext.ActionData->ActionLogicClass);
+		if (!ActionInstance) return;
+		ActionInstance->ExecuteAction(CurrentContext.InstigatorCont, CurrentContext.Target);
+	}
+	SetGamePhase(EGamePhase::Idle);
+}
+
+void ASchemeGameMode::FinalizeTurn()
+{
+	if (ASchemeGameState* SchemeGameState = GetWorld()->GetGameState<ASchemeGameState>())
+	{
+		SchemeGameState->Server_AdvanceToNextPlayerTurn(CurrentContext.InstigatorCont);
+		
+		BroadcastNotificationPacket(
+			FNotificationPacket{ServerNotificationMap.Find(EServerNotificationType::GeneralNotification)->Get(),
+			FText::FromString("Turn has ended. Next player's turn begins.")}
+		);
+	}
+	CurrentContext.Reset();
+	CurrentPhase = EGamePhase::Idle;
+}
+
+void ASchemeGameMode::SetGamePhase(EGamePhase NewPhase)
+{
+	CurrentPhase = NewPhase;
+	GetWorldTimerManager().ClearTimer(PhaseTimerHandle);
+	if (NewPhase == EGamePhase::ActionReaction)
+	{
+		if (CurrentContext.ActionData->RequiredCardToPerform)
+		{
+			BroadcastNotificationPacket(
+				FNotificationPacket{ServerNotificationMap.Find(EServerNotificationType::ChallengeNotification)->Get(),
+				FText::FromString("Challenge period has started. You have " + FString::SanitizeFloat(ReactionTime) + " seconds to respond.")}
+				);
+		}
+		if (CurrentContext.ActionData->BlockableByCard)
+		{
+			BroadcastNotificationPacket(
+				FNotificationPacket{ServerNotificationMap.Find(EServerNotificationType::BlockNotification)->Get(),
+				FText::FromString("Block period has started. You have " + FString::SanitizeFloat(ReactionTime) + " seconds to respond.")}
+				);
+		}
+		GetWorldTimerManager().SetTimer(PhaseTimerHandle, this, &ASchemeGameMode::OnPhaseTimerExpired, ReactionTime, false);
+	}
+	else if (NewPhase == EGamePhase::BlockReaction)
+	{
+		if (CurrentContext.ActionData->BlockableByCard)
+		{
+			BroadcastNotificationPacket(
+				FNotificationPacket{ServerNotificationMap.Find(EServerNotificationType::ChallengeNotification)->Get(),
+				FText::FromString("Block Challenge period has started. You have " + FString::SanitizeFloat(ReactionTime) + " seconds to respond.")}
+				);
+		}
+		GetWorldTimerManager().SetTimer(PhaseTimerHandle, this, &ASchemeGameMode::OnPhaseTimerExpired, ReactionTime, false);
+	}
+	else if (NewPhase == EGamePhase::TurnEnd)
+	{
+		FinalizeTurn();
+	}
+	
+}
+
+void ASchemeGameMode::OnPhaseTimerExpired()
+{
+	if (CurrentPhase == EGamePhase::ActionReaction)
+	{
+		BroadcastNotificationPacket(
+			FNotificationPacket{ServerNotificationMap.Find(EServerNotificationType::TimeoutNotification)->Get(),
+			FText::FromString("Action challenge period has timed out.")}
+			);
+		
+		// No challenge to action. Execute it.
+		ExecuteCurrentAction();
+		SetGamePhase(EGamePhase::TurnEnd);
+	}
+	else if (CurrentPhase == EGamePhase::BlockReaction)
+	{
+		BroadcastNotificationPacket(
+			FNotificationPacket{ServerNotificationMap.Find(EServerNotificationType::TimeoutNotification)->Get(),
+			FText::FromString("Block challenge period has timed out.")}
+			);
+		
+		SetGamePhase(EGamePhase::TurnEnd);
+	}
+}
+
+void ASchemeGameMode::AutoResolveChallenge(ASchemePlayerController* Accused, ASchemePlayerController* Challenger,
+	const UCardDataAsset* RequiredCard)
+{
+	
+	if (Accused->HasCardInHand(RequiredCard))
+	{
+		// Accused wins the challenge (blocker or action dealer)
+		
+		// Remove the revealed card from hand then draw another card (accused)
+		SwapCardForPlayer(Accused, Accused->GetCardFromHand(RequiredCard->GetCardRole()));
+		
+		ApplyPenalty(Challenger);
+		
+		if (CurrentContext.Blocker == nullptr)
+		{
+			BroadcastNotificationPacket(
+				FNotificationPacket{ServerNotificationMap.Find(EServerNotificationType::GeneralNotification)->Get(),
+				FText::FromString("The challenge failed, the action proceeds.")}
+			);
+			
+			// It was an action challenge, action proceeds (not block)
+			ExecuteCurrentAction();
+			SetGamePhase(EGamePhase::TurnEnd);
+		}
+		else
+		{
+			BroadcastNotificationPacket(
+				FNotificationPacket{ServerNotificationMap.Find(EServerNotificationType::GeneralNotification)->Get(),
+				FText::FromString("The block has succeeded, the action is blocked.")}
+			);
+			
+			// It was a block challenge, action fails (blocked)
+			SetGamePhase(EGamePhase::TurnEnd);
+		}
+	}
+	else
+	{
+		// Challenger wins the challenge
+		ApplyPenalty(Accused);
+		
+		if (CurrentContext.Blocker != nullptr && Accused == CurrentContext.Blocker)
+		{
+			// Block failed, execute action
+			BroadcastNotificationPacket(
+				FNotificationPacket{ServerNotificationMap.Find(EServerNotificationType::GeneralNotification)->Get(),
+				FText::FromString("The block has failed, the action is executed.")}
+			);
+			ExecuteCurrentAction();
+			SetGamePhase(EGamePhase::TurnEnd);
+		}
+		else
+		{
+			// Challenge succeed, stop action
+			BroadcastNotificationPacket(
+				FNotificationPacket{ServerNotificationMap.Find(EServerNotificationType::GeneralNotification)->Get(),
+				FText::FromString("The challenge succeeded, the action is blocked.")}
+			);
+			
+			SetGamePhase(EGamePhase::TurnEnd);
+		}
+	}
+}
+
+void ASchemeGameMode::ApplyPenalty(ASchemePlayerController* Victim)
+{
+	if (Victim->HasAnyCardInHand())
+	{
+		Victim->Server_RemoveRandomCardFromHand();
+		BroadcastNotificationPacket(FNotificationPacket{ServerNotificationMap.Find(EServerNotificationType::GeneralNotification)->Get(),
+		FText::FromString("Player ( " + Victim->GetName() + " ) has lost a card due to losing the challenge.")});
+	}
+	else
+	{
+		// Victim has no cards left, handle losing condition
+	}
+}
+
+void ASchemeGameMode::SwapCardForPlayer(ASchemePlayerController* Player, const ACardActor* CardToSwap)
+{
+	Player->Server_RemoveCardFromHand(CardToSwap->GetCardData());
+	DrawCard(Player, Player->GetFirstEmptyCardHoldingPointIndex());
 }

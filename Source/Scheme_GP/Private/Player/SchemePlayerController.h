@@ -13,6 +13,7 @@ class ACardTable;
 class ACardActor;
 
 struct FNotificationPacket;
+enum class ECardRole : uint8;
 
 /**
  * 
@@ -41,6 +42,8 @@ public:
 	void StartGame();
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Game System")
 	void Server_SendChallengeRequest();
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Game System")
+	void Server_SendBlockRequest();
 	
 	
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Game System")
@@ -64,6 +67,8 @@ public:
 	bool HasCardInHand(const UCardDataAsset* CardToCheck) const;
 	UFUNCTION(BlueprintPure, Category = "Card System")
 	bool HasAnyCardInHand() const;
+	UFUNCTION(BlueprintPure, Category = "Card System")
+	ACardActor* GetCardFromHand(const ECardRole RoleToGet) const;
 	
 	// Handle UI when game starts
 	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Game System")
@@ -71,7 +76,9 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Game System")
 	void OnReceiveChallengeNotification(const FText& Message);
 	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Game System")
-	void OnReceiveChallengeEndNotification(const FText& Message);
+	void OnReceiveBlockNotification(const FText& Message);
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Game System")
+	void OnReceiveTimeoutNotification(const FText& Message);
 	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Game System")
 	void OnReceiveGeneralNotification(const FText& Message);
 	

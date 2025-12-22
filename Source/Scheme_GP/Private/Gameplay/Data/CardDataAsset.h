@@ -11,10 +11,11 @@ enum class ECardRole : uint8
 {
 	Merchant,
 	Knight,
-	Steward,
-	Counselor,
+	Steward, 
+	Counselor, 
 	GuildMaster,
-	// Other roles
+	Priest,
+	
 	None
 };
 

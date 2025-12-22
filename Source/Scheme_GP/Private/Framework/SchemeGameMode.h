@@ -17,12 +17,48 @@ UENUM(BlueprintType)
 enum class EServerNotificationType : uint8
 {
 	ChallengeNotification,
+	BlockNotification,
 	TimeoutNotification,
 	GeneralNotification,
 	GameStartNotification,
 	GameEndNotification
 };
 
+UENUM(BlueprintType)
+enum class EGamePhase : uint8
+{
+	Idle,
+	ActionReaction,
+	BlockReaction,
+	Processing,
+	TurnEnd
+};
+
+USTRUCT(BlueprintType)
+struct FInteractionContext
+{
+	GENERATED_BODY()
+public:
+	UPROPERTY()
+	ASchemePlayerController* InstigatorCont = nullptr;
+	UPROPERTY()
+	ASchemePlayerController* Target = nullptr;
+	UPROPERTY()
+	UActionDataAsset* ActionData = nullptr;
+	UPROPERTY()
+	ASchemePlayerController* Challenger = nullptr;
+	UPROPERTY()
+	ASchemePlayerController* Blocker = nullptr;
+	UPROPERTY()
+	ASchemePlayerController* Loser = nullptr;
+
+	void Reset()
+	{
+		InstigatorCont = nullptr; Target = nullptr; ActionData = nullptr;
+		Blocker = nullptr; Challenger = nullptr; Loser = nullptr;
+	}
+	
+};	
 
 /**
  * 
@@ -42,23 +78,12 @@ public:
 	// Called when a player leaves (Only on server)
 	virtual void Logout(AController* Exiting) override;
 	
-	// Process a player's action request
-	void ProcessPlayerAction(ASchemePlayerController* RequestingController, UActionDataAsset* ActionData, ASchemePlayerController* TargetController);
-	// Notify all players about a player's action
-	void BroadcastPlayerActionNotification(ASchemePlayerController* ActionDealer, ASchemePlayerController* ActionTarget, FNotificationPacket& Packet);
-	// Notify all players about timeout event
-	void BroadcastTimeoutNotification();
 	
 	void BroadcastNotificationPacket(const FNotificationPacket& Packet);
-	
 	void SendGeneralNotificationToPlayer(ASchemePlayerController* TargetPlayer, const FText& Message);
 	
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 	
-	void BreakTimeoutCountdown();
-	
-	UFUNCTION(BlueprintCallable)
-	void ProcessChallengeRequest();
 	
 	UFUNCTION(BlueprintCallable)
 	void CreateVirtualDeck();
@@ -108,9 +133,40 @@ public:
 
 	UFUNCTION(BlueprintImplementableEvent)
 	void OnCanGameStartValid();
+	
+	// New System Here
+	
+	UFUNCTION(BlueprintCallable, Category = "Action Logic")
+	void ProcessActionRequest(ASchemePlayerController* InstigatorController, UActionDataAsset* ActionData, ASchemePlayerController* Target);
+	UFUNCTION(BlueprintCallable, Category = "Action Logic")
+	void ProcessChallengeRequest(ASchemePlayerController* Challenger);
+	UFUNCTION(BlueprintCallable, Category = "Action Logic")
+	void ProcessBlockRequest(ASchemePlayerController* Blocker);
+
+protected:
+	void SetGamePhase(EGamePhase NewPhase);
+	void OnPhaseTimerExpired();
+	
+	void AutoResolveChallenge(ASchemePlayerController* Accused, ASchemePlayerController* Challenger, const UCardDataAsset* RequiredCard );
+	void ApplyPenalty(ASchemePlayerController* Victim);
+	void SwapCardForPlayer(ASchemePlayerController* Player, const ACardActor* CardToSwap);
+
+	void ExecuteCurrentAction();
+	void FinalizeTurn();
 private:
 	void FindAllStartLocations();
+	
 private:
+	UPROPERTY(VisibleAnywhere, Category = "Action Logic")
+	EGamePhase CurrentPhase = EGamePhase::Idle;
+	UPROPERTY(VisibleAnywhere, Category = "Action Logic")
+	FInteractionContext CurrentContext;
+	UPROPERTY(EditDefaultsOnly, Category = "Action Logic")
+	float ReactionTime = 5.f;
+	UPROPERTY()
+	FTimerHandle PhaseTimerHandle;
+	
+	
 	UPROPERTY(EditDefaultsOnly, Category = "Card System")
 	TArray<UCardDataAsset*> AllCardDataTypes;
 	UPROPERTY(VisibleAnywhere, Category = "Card System")

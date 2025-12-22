@@ -26,9 +26,6 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Action Rules")
 	int32 GoldCost;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Action Rules")
-	bool bCanBeInterrupted;
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Action Logic")
 	TSubclassOf<UBaseAction> ActionLogicClass;

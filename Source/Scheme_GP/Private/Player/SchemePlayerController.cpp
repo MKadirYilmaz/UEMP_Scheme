@@ -92,7 +92,7 @@ void ASchemePlayerController::ExecuteAction_Implementation(UActionDataAsset* Act
 {
 	if (ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>())
 	{
-		GameMode->ProcessPlayerAction(this, ActionData, TargetController);
+		GameMode->ProcessActionRequest(this, ActionData, TargetController);
 	}
 }
 
@@ -108,7 +108,15 @@ void ASchemePlayerController::Server_SendChallengeRequest_Implementation()
 {
 	if (ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>())
 	{
-		GameMode->ProcessChallengeRequest();
+		GameMode->ProcessChallengeRequest(this);
+	}
+}
+
+void ASchemePlayerController::Server_SendBlockRequest_Implementation()
+{
+	if (ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>())
+	{
+		GameMode->ProcessBlockRequest(this);
 	}
 }
 
@@ -218,6 +226,17 @@ bool ASchemePlayerController::HasAnyCardInHand() const
 			return true;
 	}
 	return false;
+}
+
+ACardActor* ASchemePlayerController::GetCardFromHand(const ECardRole RoleToGet) const
+{
+	for (ACardActor* HeldCard : HoldingCards)
+	{
+		if (!HeldCard) continue;
+		if (HeldCard->GetCardData()->GetCardRole() == RoleToGet)
+			return HeldCard;
+	}
+	return nullptr;
 }
 
 void ASchemePlayerController::PrintHoldingCards() const
