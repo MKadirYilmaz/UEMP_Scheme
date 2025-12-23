@@ -71,7 +71,18 @@ void ASchemeGameState::Server_AdvanceToNextPlayerTurn_Implementation(ASchemePlay
 		return;
 	}
 	int32 CurrentIndex = PlayerTurnsOrder.IndexOfByKey(CurrentPlayerTurn);
-	int32 NextIndex = (CurrentIndex + 1) % PlayerTurnsOrder.Num();
+	int32 NextIndex;
+	do
+	{
+		NextIndex = (CurrentIndex + 1) % PlayerTurnsOrder.Num();
+		// Check if we have looped through all players
+		if (PlayerTurnsOrder[NextIndex] == RequestingPlayerState)
+		{
+			UE_LOG(LogTemp, Error, TEXT("All players are eliminated! No valid next player turn."));
+			return;
+		}
+	} while (Cast<ASchemePlayerState>(PlayerTurnsOrder[NextIndex])->IsEliminated());
+	
 	CurrentPlayerTurn = PlayerTurnsOrder[NextIndex];
 	OnRep_CurrentPlayerTurn();
 	

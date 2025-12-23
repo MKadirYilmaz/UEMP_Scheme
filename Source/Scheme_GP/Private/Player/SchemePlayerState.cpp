@@ -3,9 +3,6 @@
 
 #include "Player/SchemePlayerState.h"
 
-#include "Gameplay/Data/CardDataAsset.h"
-#include "Kismet/GameplayStatics.h"
-#include "Gameplay/Actors/CardTable.h"
 #include "Net/UnrealNetwork.h"
 
 void ASchemePlayerState::BeginPlay()
@@ -18,12 +15,14 @@ ASchemePlayerState::ASchemePlayerState()
 	bReplicates = true;
 }
 
-void ASchemePlayerState::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
+void ASchemePlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(ASchemePlayerState, Gold);
 	DOREPLIFETIME(ASchemePlayerState, PlayerIndex);
+	DOREPLIFETIME(ASchemePlayerState, Username);
+	DOREPLIFETIME(ASchemePlayerState, bIsEliminated);
 }
 
 void ASchemePlayerState::AddGold(int32 amount)
@@ -78,7 +77,17 @@ void ASchemePlayerState::OnRep_Gold()
 	OnGoldChange(Gold, CachedDelta);
 }
 
+void ASchemePlayerState::OnRep_Username()
+{
+	UE_LOG(LogTemp, Display, TEXT("Player Name Changed: %s"), *Username.ToString());
+}
+
 void ASchemePlayerState::OnRep_PlayerIndex()
 {
-	UE_LOG(LogTemp, Display, TEXT("Player Index Changed: %s"), *GetName());
+	UE_LOG(LogTemp, Display, TEXT("Player Index Changed: %s"), *Username.ToString());
+}
+
+void ASchemePlayerState::OnRep_IsEliminated()
+{
+	UE_LOG(LogTemp, Display, TEXT("Player Elimination Status Changed: %s"), *Username.ToString());
 }

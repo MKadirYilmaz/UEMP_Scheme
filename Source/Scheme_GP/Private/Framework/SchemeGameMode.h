@@ -79,7 +79,7 @@ public:
 	virtual void Logout(AController* Exiting) override;
 	
 	
-	void BroadcastNotificationPacket(const FNotificationPacket& Packet);
+	void BroadcastNotificationPacket(const FNotificationPacket& Packet, const ASchemePlayerController* ExcludePlayer = nullptr);
 	void SendGeneralNotificationToPlayer(ASchemePlayerController* TargetPlayer, const FText& Message);
 	
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
@@ -153,6 +153,9 @@ protected:
 
 	void ExecuteCurrentAction();
 	void FinalizeTurn();
+	
+	void CheckWinCondition();
+	void EndSchemeGame(const ASchemePlayerController* WinnerController);
 private:
 	void FindAllStartLocations();
 	

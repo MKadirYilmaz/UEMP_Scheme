@@ -18,7 +18,7 @@ void ACardActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(ACardActor, CardData);
+	DOREPLIFETIME_CONDITION(ACardActor, CardData, COND_OwnerOnly);
 }
 
 void ACardActor::SetCardData(UCardDataAsset* NewData)
@@ -27,9 +27,7 @@ void ACardActor::SetCardData(UCardDataAsset* NewData)
 	if (!CardData)
 	{
 		UE_LOG(LogTemp, Error, TEXT("%s: Card Data is NULL!"), (HasAuthority()) ? TEXT("Server") : TEXT("Client"));
-		return;
 	}
-	CardMesh->SetMaterial(0, CardData->GetCardMaterial());
 }
 
 void ACardActor::OnRep_CardData()

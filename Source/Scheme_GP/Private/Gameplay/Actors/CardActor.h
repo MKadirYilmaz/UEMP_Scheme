@@ -6,6 +6,7 @@
 #include "Gameplay/Actors/BaseInteractableActor.h"
 #include "CardActor.generated.h"
 
+class UCardDataAsset;
 /**
  * 
  */
@@ -19,19 +20,18 @@ public:
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	void SetCardData(class UCardDataAsset* NewData);
+	void SetCardData(UCardDataAsset* NewData);
+	UFUNCTION()
+	void OnRep_CardData();
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Card Visual")
 	UStaticMeshComponent* CardMesh;
 
 	UPROPERTY(ReplicatedUsing = OnRep_CardData, VisibleAnywhere, Category = "Card Data")
-	class UCardDataAsset* CardData;
-
-	UFUNCTION()
-	void OnRep_CardData();
+	UCardDataAsset* CardData = nullptr;
 
 public:
 	UFUNCTION(BlueprintCallable)
-	FORCEINLINE class UCardDataAsset* GetCardData() const { return CardData; }
+	FORCEINLINE UCardDataAsset* GetCardData() const { return CardData; }
 
 };
