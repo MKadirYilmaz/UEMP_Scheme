@@ -61,6 +61,7 @@ void ASchemeGameState::Server_ChangePlayerGoldCount_Implementation(ASchemePlayer
 
 void ASchemeGameState::Server_AdvanceToNextPlayerTurn_Implementation(ASchemePlayerController* RequestingController)
 {
+	if (!RequestingController) return;
 	APlayerState* RequestingPlayerState = RequestingController->GetPlayerState<APlayerState>();
 	if (!RequestingPlayerState) return;
 	

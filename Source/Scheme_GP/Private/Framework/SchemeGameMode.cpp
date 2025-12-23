@@ -92,7 +92,7 @@ AActor* ASchemeGameMode::ChoosePlayerStart_Implementation(AController* Player)
 		APlayerStart* PlayerStart = PlayerStartLocations[GetNumPlayers() - 1];
 		return PlayerStart;
 	}
-	UE_LOG(LogTemp, Error, TEXT("Player Start Couldn't Found!"));
+	UE_LOG(LogTemp, Error, TEXT("Player Start Could Not Find"));
 	return Super::ChoosePlayerStart_Implementation(Player);
 }
 void ASchemeGameMode::CreateVirtualDeck()
@@ -278,8 +278,9 @@ void ASchemeGameMode::ProcessChallengeRequest(ASchemePlayerController* Challenge
 		);
 		
 		AutoResolveChallenge(CurrentContext.InstigatorCont, Challenger, CurrentContext.ActionData->RequiredCardToPerform);
+		return;
 	}
-	else if (CurrentPhase == EGamePhase::BlockReaction)
+	if (CurrentPhase == EGamePhase::BlockReaction)
 	{
 		BroadcastNotificationPacket(
 			FNotificationPacket{ServerNotificationMap.Find(EServerNotificationType::TimeoutNotification)->Get(),
@@ -287,8 +288,8 @@ void ASchemeGameMode::ProcessChallengeRequest(ASchemePlayerController* Challenge
 		);
 		
 		AutoResolveChallenge(CurrentContext.Blocker, Challenger, CurrentContext.ActionData->BlockableByCard);
+		return;
 	}
-	
 	// Move to processing phase
 	CurrentPhase = EGamePhase::Processing;
 }
@@ -319,7 +320,7 @@ void ASchemeGameMode::ExecuteCurrentAction()
 		if (!ActionInstance) return;
 		ActionInstance->ExecuteAction(CurrentContext.InstigatorCont, CurrentContext.Target);
 	}
-	SetGamePhase(EGamePhase::Idle);
+	SetGamePhase(EGamePhase::TurnEnd);
 }
 
 void ASchemeGameMode::FinalizeTurn()
@@ -423,7 +424,6 @@ void ASchemeGameMode::AutoResolveChallenge(ASchemePlayerController* Accused, ASc
 			
 			// It was an action challenge, action proceeds (not block)
 			ExecuteCurrentAction();
-			SetGamePhase(EGamePhase::TurnEnd);
 		}
 		else
 		{
@@ -449,7 +449,6 @@ void ASchemeGameMode::AutoResolveChallenge(ASchemePlayerController* Accused, ASc
 				FText::FromString("The block has failed, the action is executed.")}
 			);
 			ExecuteCurrentAction();
-			SetGamePhase(EGamePhase::TurnEnd);
 		}
 		else
 		{
