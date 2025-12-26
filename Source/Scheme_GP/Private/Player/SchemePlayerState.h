@@ -21,9 +21,9 @@ public:
 
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 	
-	// Do not call this function other than GameMode class
+	// Do not call this function other than server
 	void AddGold(int32 amount);
-	// Do not call this function other than GameMode class
+	// Do not call this function other than server
 	bool RemoveGold(int32 amount);
 	
 	

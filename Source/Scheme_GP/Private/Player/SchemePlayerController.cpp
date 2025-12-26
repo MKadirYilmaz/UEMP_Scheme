@@ -57,6 +57,17 @@ void ASchemePlayerController::GetLifetimeReplicatedProps(TArray<class FLifetimeP
 	DOREPLIFETIME(ASchemePlayerController, HoldingCards);
 }
 
+ASchemeGameMode* ASchemePlayerController::TryGetGameMode() const
+{
+	return HasAuthority() ? GetWorld()->GetAuthGameMode<ASchemeGameMode>() : nullptr;
+		
+}
+
+ASchemeGameState* ASchemePlayerController::TryGetGameState() const
+{
+	return HasAuthority() ? Cast<ASchemeGameState>(GetWorld()->GetGameState()) : nullptr;
+}
+
 void ASchemePlayerController::Client_ReceiveNotification_Implementation(const FNotificationPacket& Notification)
 {
 	if (Notification.NotificationType == nullptr)

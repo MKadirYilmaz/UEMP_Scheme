@@ -31,12 +31,15 @@ public:
 	UFUNCTION(Server, Reliable, BlueprintCallable)
 	void Server_ChangePlayerGoldCount(ASchemePlayerState* RequestingPlayerState, int32 Amount);
 	
+	UFUNCTION(BlueprintCallable)
+	void StealGoldFromPlayer(ASchemePlayerState* FromPlayer, ASchemePlayerState* ToPlayer, int32 Amount);
+	
 public:
 	UPROPERTY(ReplicatedUsing = OnRep_CurrentPlayerTurn, VisibleAnywhere, BlueprintReadOnly, Category = "Player Turn")
-	class APlayerState* CurrentPlayerTurn;
+	APlayerState* CurrentPlayerTurn;
 
 	UPROPERTY(ReplicatedUsing = OnRep_CurrentPlayerTurn, VisibleAnywhere, BlueprintReadOnly, Category = "Player Turn")
-	TArray<class APlayerState*> PlayerTurnsOrder;
+	TArray<APlayerState*> PlayerTurnsOrder;
 
 
 

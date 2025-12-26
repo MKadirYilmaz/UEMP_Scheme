@@ -33,6 +33,19 @@ void ASchemeGameState::OnRep_PlayerTurnsOrder()
 	UE_LOG(LogTemp, Display, TEXT("Player Turns Order Changed!"));
 }
 
+void ASchemeGameState::StealGoldFromPlayer(ASchemePlayerState* FromPlayer, ASchemePlayerState* ToPlayer, int32 Amount)
+{
+	if (!HasAuthority() || !FromPlayer || !ToPlayer || Amount <= 0)
+		return;
+	
+	if (FromPlayer->GetGold() < Amount)
+	{
+		Amount = FromPlayer->GetGold();
+	}
+	FromPlayer->RemoveGold(Amount);
+	ToPlayer->AddGold(Amount);
+}
+
 void ASchemeGameState::Server_ChangePlayerGoldCount_Implementation(ASchemePlayerState* RequestingPlayerState,
                                                                    int32 Amount)
 {
@@ -72,11 +85,14 @@ void ASchemeGameState::Server_AdvanceToNextPlayerTurn_Implementation(ASchemePlay
 	}
 	int32 CurrentIndex = PlayerTurnsOrder.IndexOfByKey(CurrentPlayerTurn);
 	int32 NextIndex;
+	
+	int32 FreezeProtectionCounter = 0;
 	do
 	{
+		FreezeProtectionCounter++;
 		NextIndex = (CurrentIndex + 1) % PlayerTurnsOrder.Num();
 		// Check if we have looped through all players
-		if (PlayerTurnsOrder[NextIndex] == RequestingPlayerState)
+		if (PlayerTurnsOrder[NextIndex] == RequestingPlayerState || FreezeProtectionCounter > PlayerTurnsOrder.Num())
 		{
 			UE_LOG(LogTemp, Error, TEXT("All players are eliminated! No valid next player turn."));
 			return;

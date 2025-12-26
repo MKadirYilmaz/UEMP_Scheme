@@ -15,8 +15,7 @@ enum class ECardRole : uint8
 	Counselor, 
 	GuildMaster,
 	Priest,
-	
-	None
+	Jester
 };
 
 /**

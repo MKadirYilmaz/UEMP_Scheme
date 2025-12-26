@@ -6,7 +6,9 @@
 #include "GameFramework/PlayerController.h"
 #include "SchemePlayerController.generated.h"
 
+class ASchemeGameState;
 class ASchemePlayerState;
+class ASchemeGameMode;
 class UActionDataAsset;
 class UCardDataAsset;
 class ACardTable;
@@ -31,6 +33,11 @@ protected:
 public:
 	
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+	
+	UFUNCTION(BlueprintCallable, Category = "Game System")
+	ASchemeGameMode* TryGetGameMode() const;
+	UFUNCTION(BlueprintCallable, Category = "Game System")
+	ASchemeGameState* TryGetGameState() const;
 	
 	// Called in server, works in clients
 	UFUNCTION(Client, Reliable, BlueprintCallable, Category = "Notification System")
@@ -88,9 +95,9 @@ public:
 	UFUNCTION()
 	void OnRep_HoldingCards() const;
 	
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Card System")
 	int32 GetFirstEmptyCardHoldingPointIndex() const;
 	FTransform GetCardHoldingPoint(int32 Index) const;
-	//void SetHoldingPointState(int32 Index, bool bIsUsed);
 	
 private:
 	/**
