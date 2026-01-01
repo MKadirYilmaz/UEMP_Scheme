@@ -70,6 +70,12 @@ bool ASchemePlayerState::RemoveGold(int32 amount)
 	return true;
 }
 
+void ASchemePlayerState::ResetState_Implementation()
+{
+	Gold = 2;
+	bIsEliminated = false;
+}
+
 void ASchemePlayerState::OnRep_Gold()
 {
 	// Called automatically in clients when the gold value has changed.

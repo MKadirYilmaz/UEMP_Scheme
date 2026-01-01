@@ -99,11 +99,13 @@ void ASchemePlayerController::Client_InteractNotify_Implementation(AActor* Inter
 	IInteractableInterface::Execute_OnInteractionSuccessInClient(InteractActor, Interactor);
 }
 
-void ASchemePlayerController::ExecuteAction_Implementation(UActionDataAsset* ActionData, ASchemePlayerController* TargetController)
+void ASchemePlayerController::ExecuteAction_Implementation(UActionDataAsset* ActionData, ASchemePlayerState* TargetState)
 {
 	if (ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>())
 	{
-		GameMode->ProcessActionRequest(this, ActionData, TargetController);
+		ASchemePlayerController* Controller = (TargetState) ? Cast<ASchemePlayerController>(TargetState->GetPlayerController()) : nullptr;
+		
+		GameMode->ProcessActionRequest(this, ActionData, Controller);
 	}
 }
 
@@ -192,23 +194,28 @@ void ASchemePlayerController::Server_RemoveRandomCardFromHand_Implementation()
 		UE_LOG(LogTemp, Error, TEXT("No cards in hand to remove!"));
 		return;
 	}
-	// Create a temporary array of real cards (non-null)
-	TArray<ACardActor*> RealCards;
+	// Create a temporary array of indices for real cards (non-null)
+	TArray<int32> ValidIndices;
 	for (int32 i = 0; i < HoldingCards.Num(); i++)
 	{
 		if (HoldingCards[i])
 		{
-			RealCards.Add(HoldingCards[i]);
+			ValidIndices.Add(i);
 		}
 	}
-	// Select a random index from the real cards
-	int32 RandomIndex = FMath::RandRange(0, RealCards.Num() - 1);
+
+	if (ValidIndices.Num() == 0) return;
+
+	// Select a random index from the valid indices
+	int32 RandomIndex = FMath::RandRange(0, ValidIndices.Num() - 1);
+	int32 IndexToRemove = ValidIndices[RandomIndex];
+
 	if (ASchemeGameMode* GameMode = GetWorld()->GetAuthGameMode<ASchemeGameMode>())
 	{
-		ACardActor* CardToReturn = RealCards[RandomIndex];
+		ACardActor* CardToReturn = HoldingCards[IndexToRemove];
 		GameMode->ReturnCardToDeck(CardToReturn);
 	}
-	HoldingCards.RemoveAt(RandomIndex);
+	HoldingCards[IndexToRemove] = nullptr;
 	OnRep_HoldingCards();
 }
 
@@ -288,6 +295,19 @@ FTransform ASchemePlayerController::GetCardHoldingPoint(int32 Index) const
 	if (PlayerIndex >= CardTable->GetCardPointsStructs().Num() || Index >= CardTable->GetCardPointsStructs()[PlayerIndex].CardTransforms.Num())
 		return FTransform();
 	return CardTable->GetCardPointsStructs()[PlayerIndex].CardTransforms[Index];
+}
+
+void ASchemePlayerController::ResetState_Implementation()
+{
+	for (int32 i = 0; i < HoldingCards.Num(); i++)
+	{
+		if (HoldingCards[i])
+		{
+			HoldingCards[i]->Destroy();
+			HoldingCards[i] = nullptr;
+		}
+	}
+	OnRep_HoldingCards();
 }
 
 void ASchemePlayerController::HandleClampedRotation(float MouseInputYaw, float MouseInputPitch)

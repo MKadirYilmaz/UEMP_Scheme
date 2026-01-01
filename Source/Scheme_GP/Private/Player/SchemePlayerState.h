@@ -29,7 +29,9 @@ public:
 	
 	UFUNCTION(BlueprintImplementableEvent, Category = "Gold")
 	void OnGoldChange(int32 NewGold, int32 Delta);
-
+	
+	UFUNCTION(Server, Reliable, BlueprintCallable)
+	void ResetState();
 protected:
 
 	UPROPERTY(ReplicatedUsing = OnRep_PlayerIndex, VisibleAnywhere)

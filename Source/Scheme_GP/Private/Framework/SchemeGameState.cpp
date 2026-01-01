@@ -46,6 +46,11 @@ void ASchemeGameState::StealGoldFromPlayer(ASchemePlayerState* FromPlayer, ASche
 	ToPlayer->AddGold(Amount);
 }
 
+void ASchemeGameState::ResetState_Implementation()
+{
+	CurrentPlayerTurn = nullptr;
+}
+
 void ASchemeGameState::Server_ChangePlayerGoldCount_Implementation(ASchemePlayerState* RequestingPlayerState,
                                                                    int32 Amount)
 {
@@ -83,23 +88,34 @@ void ASchemeGameState::Server_AdvanceToNextPlayerTurn_Implementation(ASchemePlay
 		UE_LOG(LogTemp, Display, TEXT("Not this player's turn to advance!"));
 		return;
 	}
+	ForceAdvanceTurn();
+}
+
+void ASchemeGameState::ForceAdvanceTurn()
+{
+	if (PlayerTurnsOrder.Num() == 0) return;
+
 	int32 CurrentIndex = PlayerTurnsOrder.IndexOfByKey(CurrentPlayerTurn);
-	int32 NextIndex;
+	// If CurrentPlayerTurn is not in the list (e.g. just removed), CurrentIndex is -1.
+	// In that case, we start from -1, so NextIndex becomes 0.
 	
+	int32 NextIndex;
 	int32 FreezeProtectionCounter = 0;
+	
 	do
 	{
 		FreezeProtectionCounter++;
 		NextIndex = (CurrentIndex + 1) % PlayerTurnsOrder.Num();
+		CurrentIndex = NextIndex; // Advance for next iteration check
+		
 		// Check if we have looped through all players
-		if (PlayerTurnsOrder[NextIndex] == RequestingPlayerState || FreezeProtectionCounter > PlayerTurnsOrder.Num())
+		if (FreezeProtectionCounter > PlayerTurnsOrder.Num() + 1)
 		{
-			UE_LOG(LogTemp, Error, TEXT("All players are eliminated! No valid next player turn."));
+			UE_LOG(LogTemp, Error, TEXT("All players are eliminated or list empty! No valid next player turn."));
 			return;
 		}
-	} while (Cast<ASchemePlayerState>(PlayerTurnsOrder[NextIndex])->IsEliminated());
+	} while (PlayerTurnsOrder[NextIndex] && Cast<ASchemePlayerState>(PlayerTurnsOrder[NextIndex])->IsEliminated());
 	
 	CurrentPlayerTurn = PlayerTurnsOrder[NextIndex];
 	OnRep_CurrentPlayerTurn();
-	
 }

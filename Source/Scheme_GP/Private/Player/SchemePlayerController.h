@@ -44,7 +44,7 @@ public:
 	void Client_ReceiveNotification(const FNotificationPacket& Notification);
 	
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Game System")
-	void ExecuteAction(UActionDataAsset* ActionData, ASchemePlayerController* TargetController);
+	void ExecuteAction(UActionDataAsset* ActionData, ASchemePlayerState* TargetState);
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Game System")
 	void StartGame();
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Game System")
@@ -99,6 +99,8 @@ public:
 	int32 GetFirstEmptyCardHoldingPointIndex() const;
 	FTransform GetCardHoldingPoint(int32 Index) const;
 	
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Game System")
+	void ResetState();
 private:
 	/**
 	 * Handles camera rotation based on mouse input while enforcing yaw and pitch rotation limits.

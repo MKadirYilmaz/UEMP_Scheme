@@ -28,12 +28,17 @@ public:
 
 	UFUNCTION(Server, Reliable, BlueprintCallable)
 	void Server_AdvanceToNextPlayerTurn(ASchemePlayerController* RequestingController);
+
+	void ForceAdvanceTurn();
+
 	UFUNCTION(Server, Reliable, BlueprintCallable)
 	void Server_ChangePlayerGoldCount(ASchemePlayerState* RequestingPlayerState, int32 Amount);
 	
 	UFUNCTION(BlueprintCallable)
 	void StealGoldFromPlayer(ASchemePlayerState* FromPlayer, ASchemePlayerState* ToPlayer, int32 Amount);
 	
+	UFUNCTION(Server, Reliable, BlueprintCallable)
+	void ResetState();
 public:
 	UPROPERTY(ReplicatedUsing = OnRep_CurrentPlayerTurn, VisibleAnywhere, BlueprintReadOnly, Category = "Player Turn")
 	APlayerState* CurrentPlayerTurn;

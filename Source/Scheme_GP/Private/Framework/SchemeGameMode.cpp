@@ -60,6 +60,73 @@ void ASchemeGameMode::Logout(AController* Exiting)
 		return;
 
 	UE_LOG(LogTemp, Display, TEXT("Player Has Left! %s"), *Exiting->GetName());
+
+	ASchemePlayerController* ExitingPC = Cast<ASchemePlayerController>(Exiting);
+	
+	// 1. Handle Active Context / Phase
+	if (bIsGameStarted && ExitingPC)
+	{
+		bool bResetPhase = false;
+		if (CurrentContext.InstigatorCont == ExitingPC)
+		{
+			// Instigator left. Cancel action.
+			SendGeneralNotificationToPlayer(CurrentContext.Target, FText::FromString("Action cancelled because the instigator left the game."));
+			bResetPhase = true;
+		}
+		else if (CurrentContext.Target == ExitingPC)
+		{
+			// Target left.
+			SendGeneralNotificationToPlayer(CurrentContext.InstigatorCont, FText::FromString("Action cancelled because the target left the game."));
+			bResetPhase = true;
+		}
+		else if (CurrentContext.Challenger == ExitingPC)
+		{
+			// Challenger left.
+			bResetPhase = true;
+		}
+		else if (CurrentContext.Blocker == ExitingPC)
+		{
+			// Blocker left.
+			bResetPhase = true;
+		}
+
+		if (bResetPhase)
+		{
+			CurrentContext.Reset();
+			SetGamePhase(EGamePhase::Idle);
+			// Clear any timers
+			GetWorldTimerManager().ClearTimer(PhaseTimerHandle);
+		}
+	}
+
+	// 2. Remove from lists first
+	CurrentPlayers.Remove(Cast<APlayerController>(Exiting));
+	
+	bool bWasCurrentTurn = false;
+	ASchemeGameState* SGS = Cast<ASchemeGameState>(GameState);
+	
+	if (SGS)
+	{
+		if (ASchemePlayerState* SPS = Exiting->GetPlayerState<ASchemePlayerState>())
+		{
+			bWasCurrentTurn = (SGS->CurrentPlayerTurn == SPS);
+			SGS->PlayerTurnsOrder.Remove(SPS);
+		}
+	}
+
+	// 3. Check Win Condition (This might end the game)
+	if (bIsGameStarted)
+	{
+		CheckWinCondition();
+	}
+	
+	// 4. Handle Turn System
+	// Only advance turn if the game is STILL started and, it was the exiting player's turn.
+	if (bIsGameStarted && bWasCurrentTurn && SGS)
+	{
+		// Force advance turn since the current player left
+		SGS->ForceAdvanceTurn();
+	}
 }
 
 void ASchemeGameMode::BroadcastNotificationPacket(const FNotificationPacket& Packet, const ASchemePlayerController* ExcludePlayer)
@@ -325,17 +392,24 @@ void ASchemeGameMode::ProcessBlockRequest(ASchemePlayerController* Blocker)
 
 void ASchemeGameMode::ExecuteCurrentAction()
 {
+	if (!bIsGameStarted) return;
+
 	if (CurrentContext.ActionData && CurrentContext.ActionData->ActionLogicClass)
 	{
 		UBaseAction* ActionInstance = NewObject<UBaseAction>(this, CurrentContext.ActionData->ActionLogicClass);
 		if (!ActionInstance) return;
 		ActionInstance->ExecuteAction(CurrentContext.InstigatorCont, CurrentContext.Target);
 	}
+
+	CheckPlayerCondition(CurrentContext.Target);
+
 	SetGamePhase(EGamePhase::TurnEnd);
 }
 
 void ASchemeGameMode::FinalizeTurn()
 {
+	if (!bIsGameStarted) return;
+
 	if (ASchemeGameState* SchemeGameState = GetWorld()->GetGameState<ASchemeGameState>())
 	{
 		SchemeGameState->Server_AdvanceToNextPlayerTurn(CurrentContext.InstigatorCont);
@@ -349,14 +423,35 @@ void ASchemeGameMode::FinalizeTurn()
 	CurrentPhase = EGamePhase::Idle;
 }
 
+void ASchemeGameMode::CheckPlayerCondition(const ASchemePlayerController* CheckPlayer)
+{
+	if (!CheckPlayer) return;
+	
+	// Check if there are any cards left
+	if (!CheckPlayer->HasAnyCardInHand())
+	{
+		ASchemePlayerState* SchemePlayerState = CheckPlayer->GetPlayerState<ASchemePlayerState>();
+		if (!SchemePlayerState) return;
+		
+		SchemePlayerState->SetIsEliminated(true);
+		BroadcastNotificationPacket(FNotificationPacket{
+			ServerNotificationMap.Find(EServerNotificationType::GeneralNotification)->Get(),
+			FText::FromString("Player ( " + SchemePlayerState->GetUsername().ToString() + "eliminated from the game due to losing all cards.")}
+		);
+		
+		CheckWinCondition();
+	}	
+}
+
 void ASchemeGameMode::CheckWinCondition()
 {
 	int32 ActivePlayers = 0;
 	APlayerController* PotentialWinner = nullptr;
 	for (APlayerController* PlayerController : CurrentPlayers)
 	{
+		if (!PlayerController) continue;
 		ASchemePlayerState* PlayerState = PlayerController->GetPlayerState<ASchemePlayerState>();
-		if (!PlayerState && !PlayerState->IsEliminated())
+		if (PlayerState && !PlayerState->IsEliminated())
 		{
 			ActivePlayers++;
 			PotentialWinner = PlayerController;
@@ -366,20 +461,59 @@ void ASchemeGameMode::CheckWinCondition()
 	{
 		EndSchemeGame(Cast<ASchemePlayerController>(PotentialWinner));
 	}
+	else if (ActivePlayers == 0 && bIsGameStarted)
+	{
+		// Everyone left or eliminated?
+		ResetGame();
+	}
 	
 }
 
 void ASchemeGameMode::EndSchemeGame(const ASchemePlayerController* WinnerController)
 {
 	BroadcastNotificationPacket(
-		FNotificationPacket{ServerNotificationMap.Find(EServerNotificationType::GameEndNotification)->Get(),
+		FNotificationPacket{ServerNotificationMap.Find(EServerNotificationType::GeneralNotification)->Get(),
 		FText::FromString("The game has ended! The winner is " + WinnerController->GetPlayerState<ASchemePlayerState>()->GetUsername().ToString() + ".")}
 	);
 	bIsGameStarted = false;
+	
+	// Restart game after 10 seconds
+	FTimerHandle RestartHandle;
+	GetWorldTimerManager().SetTimer(RestartHandle, this, &ASchemeGameMode::ResetGame, 10.f, false);
+}
+
+void ASchemeGameMode::ResetGame()
+{
+	bIsGameStarted = false;
+	bCanGameStart = (CurrentPlayers.Num() >= MinPlayer && CurrentPlayers.Num() <= MaxPlayer);
+	CurrentPhase = EGamePhase::Idle;
+	CurrentContext.Reset();
+	CurrentTurnIndex = 0;
+	
+	// Reset GameState
+	if (ASchemeGameState* SGS = GetGameState<ASchemeGameState>())
+	{
+		SGS->ResetState();
+	}
+	
+	// Reset Players
+	for (APlayerController* PC : CurrentPlayers)
+	{
+		if (ASchemePlayerController* SPC = Cast<ASchemePlayerController>(PC))
+		{
+			SPC->ResetState();
+		}
+		if (ASchemePlayerState* SPS = PC->GetPlayerState<ASchemePlayerState>())
+		{
+			SPS->ResetState();
+		}
+	}
 }
 
 void ASchemeGameMode::SetGamePhase(EGamePhase NewPhase)
 {
+	if (!bIsGameStarted) return;
+
 	CurrentPhase = NewPhase;
 	GetWorldTimerManager().ClearTimer(PhaseTimerHandle);
 	if (NewPhase == EGamePhase::ActionReaction)
@@ -521,19 +655,8 @@ void ASchemeGameMode::ApplyPenalty(ASchemePlayerController* Victim)
 		FText::FromString("Player ( " + Victim->GetName() + " ) has lost a card due to losing the challenge.")});
 
 	}
-	// Check if there are any cards left
-	if (!Victim->HasAnyCardInHand())
-	{
-		ASchemePlayerState* SchemePlayerState = Victim->GetPlayerState<ASchemePlayerState>();
-		if (!SchemePlayerState) return;
-		
-		SchemePlayerState->SetIsEliminated(true);
-		BroadcastNotificationPacket(FNotificationPacket{
-			ServerNotificationMap.Find(EServerNotificationType::GeneralNotification)->Get(),
-			FText::FromString("Player ( " + SchemePlayerState->GetUsername().ToString() + "eliminated from the game due to losing all cards.")}
-		);
-		
-	}
+	
+	CheckPlayerCondition(Victim);
 }
 
 void ASchemeGameMode::SwapCardForPlayer(ASchemePlayerController* Player, const ACardActor* CardToSwap)

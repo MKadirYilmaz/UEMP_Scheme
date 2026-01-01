@@ -154,8 +154,12 @@ protected:
 	void ExecuteCurrentAction();
 	void FinalizeTurn();
 	
+	void CheckPlayerCondition(const ASchemePlayerController* CheckPlayer);
+	
 	void CheckWinCondition();
 	void EndSchemeGame(const ASchemePlayerController* WinnerController);
+	
+	void ResetGame();
 private:
 	void FindAllStartLocations();
 	
