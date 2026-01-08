@@ -81,6 +81,8 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Game System")
 	void OnReceiveStartGameNotification();
 	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Game System")
+	void OnReceiveEndGameNotification(const FText& Message);
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Game System")
 	void OnReceiveChallengeNotification(const FText& Message);
 	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Game System")
 	void OnReceiveBlockNotification(const FText& Message);
@@ -88,6 +90,16 @@ public:
 	void OnReceiveTimeoutNotification(const FText& Message);
 	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Game System")
 	void OnReceiveGeneralNotification(const FText& Message);
+	
+	UFUNCTION(Client, Reliable)
+	void Client_OnTurnComesToPlayer();
+	UFUNCTION(Client, Reliable)
+	void Client_OnTurnEndsForPlayer();
+	
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Game System")
+	void OnTurnStart();
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Game System")
+	void OnTurnEnd();
 	
 	UFUNCTION(BlueprintCallable)
 	void PrintHoldingCards() const;

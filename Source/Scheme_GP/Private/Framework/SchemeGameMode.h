@@ -12,6 +12,7 @@ class ASchemePlayerController;
 class ACardActor;
 class UCardDataAsset;
 class APlayerStart;
+class ASchemePlayerState;
 
 UENUM(BlueprintType)
 enum class EServerNotificationType : uint8
@@ -134,6 +135,8 @@ public:
 	UFUNCTION(BlueprintImplementableEvent)
 	void OnCanGameStartValid();
 	
+	void OnTurnChanged(ASchemePlayerState* NewTurnPlayer);
+
 	// New System Here
 	
 	UFUNCTION(BlueprintCallable, Category = "Action Logic")
@@ -173,6 +176,8 @@ private:
 	UPROPERTY()
 	FTimerHandle PhaseTimerHandle;
 	
+	UPROPERTY(EditDefaultsOnly, Category = "Game Rules")
+	UActionDataAsset* ForcedActionData;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Card System")
 	TArray<UCardDataAsset*> AllCardDataTypes;

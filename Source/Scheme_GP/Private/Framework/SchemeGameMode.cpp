@@ -37,6 +37,7 @@ void ASchemeGameMode::PostLogin(APlayerController* NewPlayer)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("		Player State Created! %s"), *PlayerState->GetName());
 		PlayerState->SetPlayerIndex(CurrentPlayers.Num());
+		PlayerState->SetUsername(FText::FromString(FString::Printf(TEXT("Player%d"), PlayerState->GetPlayerIndex())));
 		
 		CurrentPlayers.Add(NewPlayer);
 		if (ASchemeGameState* SGS = Cast<ASchemeGameState>(GameState))
@@ -276,6 +277,8 @@ void ASchemeGameMode::StartSchemeGame()
 	{
 		SchemeGameState->CurrentPlayerTurn = CurrentPlayers[CurrentTurnIndex]->PlayerState;
 		SchemeGameState->OnRep_CurrentPlayerTurn();
+		
+		Cast<ASchemePlayerController>(SchemeGameState->CurrentPlayerTurn->GetPlayerController())->Client_OnTurnComesToPlayer();
 	}
 	bIsGameStarted = true;
 	
@@ -317,6 +320,22 @@ void ASchemeGameMode::ProcessActionRequest(ASchemePlayerController* InstigatorCo
 	{
 		SendGeneralNotificationToPlayer(InstigatorController, FText::FromString("Cannot perform action right now."));
 		return;
+	}
+
+	// Check Forced Action Rule
+	if (ForcedActionData)
+	{
+		if (ASchemePlayerState* PS = InstigatorController->GetPlayerState<ASchemePlayerState>())
+		{
+			if (PS->ShouldForceAct())
+			{
+				if (ActionData != ForcedActionData)
+				{
+					SendGeneralNotificationToPlayer(InstigatorController, FText::FromString("You have too much gold! You are forced to use the special action."));
+					return;
+				}
+			}
+		}
 	}
 	
 	CurrentContext.Reset();
@@ -384,7 +403,7 @@ void ASchemeGameMode::ProcessBlockRequest(ASchemePlayerController* Blocker)
 	
 	BroadcastNotificationPacket(
 		FNotificationPacket{ServerNotificationMap.Find(EServerNotificationType::TimeoutNotification)->Get(),
-		FText::FromString("An action block has been declared.")}
+		FText::FromString("An action block has been declared. Blocker claims it has the card: " + CurrentContext.ActionData->BlockableByCard->GetCardName().ToString())}
 	);
 	
 	SetGamePhase(EGamePhase::BlockReaction);
@@ -475,6 +494,11 @@ void ASchemeGameMode::EndSchemeGame(const ASchemePlayerController* WinnerControl
 		FNotificationPacket{ServerNotificationMap.Find(EServerNotificationType::GeneralNotification)->Get(),
 		FText::FromString("The game has ended! The winner is " + WinnerController->GetPlayerState<ASchemePlayerState>()->GetUsername().ToString() + ".")}
 	);
+	BroadcastNotificationPacket(
+		FNotificationPacket{ServerNotificationMap.Find(EServerNotificationType::GameEndNotification)->Get(),
+		FText::FromString(WinnerController->GetPlayerState<ASchemePlayerState>()->GetUsername().ToString())}
+	);
+	
 	bIsGameStarted = false;
 	
 	// Restart game after 10 seconds
@@ -518,20 +542,24 @@ void ASchemeGameMode::SetGamePhase(EGamePhase NewPhase)
 	GetWorldTimerManager().ClearTimer(PhaseTimerHandle);
 	if (NewPhase == EGamePhase::ActionReaction)
 	{
+		FText PlayerName = FText::FromString("Player");
+		if (ASchemePlayerState* PlayerState = CurrentContext.InstigatorCont->GetPlayerState<ASchemePlayerState>())
+			PlayerName = PlayerState->GetUsername();
+		
 		if (CurrentContext.ActionData->RequiredCardToPerform)
 		{
 			BroadcastNotificationPacket(
 				FNotificationPacket{ServerNotificationMap.Find(EServerNotificationType::ChallengeNotification)->Get(),
-				FText::FromString("Challenge period has started. You have " + FString::SanitizeFloat(ReactionTime) + " seconds to respond.")}, 
+				FText::FromString(PlayerName.ToString() + " has performed " + CurrentContext.ActionData->ActionName.ToString() + ". You have " + FString::SanitizeFloat(ReactionTime) + " seconds to respond.")},
 				CurrentContext.InstigatorCont
-			);
+				);
 				
 		}
 		if (CurrentContext.ActionData->BlockableByCard)
 		{
 			BroadcastNotificationPacket(
 				FNotificationPacket{ServerNotificationMap.Find(EServerNotificationType::BlockNotification)->Get(),
-				FText::FromString("Block period has started. You have " + FString::SanitizeFloat(ReactionTime) + " seconds to respond.")},
+				FText::FromString(PlayerName.ToString() + " has performed " + CurrentContext.ActionData->ActionName.ToString() + ". You have " + FString::SanitizeFloat(ReactionTime) + " seconds to respond.")},
 				CurrentContext.InstigatorCont
 				);
 		}
@@ -539,11 +567,14 @@ void ASchemeGameMode::SetGamePhase(EGamePhase NewPhase)
 	}
 	else if (NewPhase == EGamePhase::BlockReaction)
 	{
+		FText PlayerName = FText::FromString("Player");
+		if (ASchemePlayerState* PlayerState = CurrentContext.Blocker->GetPlayerState<ASchemePlayerState>())
+			PlayerName = PlayerState->GetUsername();
 		if (CurrentContext.ActionData->BlockableByCard)
 		{
 			BroadcastNotificationPacket(
 				FNotificationPacket{ServerNotificationMap.Find(EServerNotificationType::ChallengeNotification)->Get(),
-				FText::FromString("Block Challenge period has started. You have " + FString::SanitizeFloat(ReactionTime) + " seconds to respond.")},
+				FText::FromString(PlayerName.ToString() + " has performed a block. Claiming has the card: " + CurrentContext.ActionData->BlockableByCard->GetCardName().ToString() + ". You have " + FString::SanitizeFloat(ReactionTime) + " seconds to respond.")},
 				CurrentContext.Blocker
 				);
 		}
@@ -569,8 +600,9 @@ void ASchemeGameMode::OnPhaseTimerExpired()
 		// No challenge to action. Execute it.
 		ExecuteCurrentAction();
 		SetGamePhase(EGamePhase::TurnEnd);
+		return;
 	}
-	else if (CurrentPhase == EGamePhase::BlockReaction)
+	if (CurrentPhase == EGamePhase::BlockReaction)
 	{
 		BroadcastNotificationPacket(
 			FNotificationPacket{ServerNotificationMap.Find(EServerNotificationType::TimeoutNotification)->Get(),
@@ -652,7 +684,7 @@ void ASchemeGameMode::ApplyPenalty(ASchemePlayerController* Victim)
 	{
 		Victim->Server_RemoveRandomCardFromHand();
 		BroadcastNotificationPacket(FNotificationPacket{ServerNotificationMap.Find(EServerNotificationType::GeneralNotification)->Get(),
-		FText::FromString("Player ( " + Victim->GetName() + " ) has lost a card due to losing the challenge.")});
+		FText::FromString(Victim->GetPlayerState<ASchemePlayerState>()->GetUsername().ToString() + " has lost a card due to losing the challenge.")});
 
 	}
 	
@@ -665,4 +697,17 @@ void ASchemeGameMode::SwapCardForPlayer(ASchemePlayerController* Player, const A
 	
 	Player->Server_RemoveCardFromHand(CardToSwap->GetCardData());
 	DrawCard(Player, Player->GetFirstEmptyCardHoldingPointIndex());
+}
+
+void ASchemeGameMode::OnTurnChanged(ASchemePlayerState* NewTurnPlayer)
+{
+	if (!NewTurnPlayer) return;
+
+	if (ForcedActionData && NewTurnPlayer->ShouldForceAct())
+	{
+		if (ASchemePlayerController* PC = Cast<ASchemePlayerController>(NewTurnPlayer->GetPlayerController()))
+		{
+			SendGeneralNotificationToPlayer(PC, FText::FromString("You have over 10 gold! You must use the forced action this turn."));
+		}
+	}
 }

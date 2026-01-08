@@ -3,6 +3,7 @@
 
 #include "Framework/SchemeGameState.h"
 
+#include "Framework/SchemeGameMode.h"
 #include "GameFramework/PlayerState.h"
 #include "Player/SchemePlayerController.h"
 #include "Player/SchemePlayerState.h"
@@ -115,7 +116,16 @@ void ASchemeGameState::ForceAdvanceTurn()
 			return;
 		}
 	} while (PlayerTurnsOrder[NextIndex] && Cast<ASchemePlayerState>(PlayerTurnsOrder[NextIndex])->IsEliminated());
+	// Notify the current player that their turn is ending
+	Cast<ASchemePlayerController>(CurrentPlayerTurn->GetPlayerController())->Client_OnTurnEndsForPlayer();
 	
 	CurrentPlayerTurn = PlayerTurnsOrder[NextIndex];
+	// Notify the next player that their turn is starting
+	Cast<ASchemePlayerController>(CurrentPlayerTurn->GetPlayerController())->Client_OnTurnComesToPlayer();
 	OnRep_CurrentPlayerTurn();
+	
+	if (ASchemeGameMode* GM = GetWorld()->GetAuthGameMode<ASchemeGameMode>())
+	{
+		GM->OnTurnChanged(Cast<ASchemePlayerState>(CurrentPlayerTurn));
+	}
 }

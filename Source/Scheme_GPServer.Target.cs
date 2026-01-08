@@ -3,12 +3,12 @@
 using UnrealBuildTool;
 using System.Collections.Generic;
 
-public class Scheme_GPEditorTarget : TargetRules
+public class Scheme_GPServerTarget : TargetRules
 {
-	public Scheme_GPEditorTarget(TargetInfo Target) : base(Target)
+	public Scheme_GPServerTarget(TargetInfo Target) : base(Target)
 	{
-		Type = TargetType.Editor;
-		DefaultBuildSettings = BuildSettingsVersion.V6;
+		Type = TargetType.Server;
+		DefaultBuildSettings = BuildSettingsVersion.V5;
 
 		ExtraModuleNames.AddRange( new string[] { "Scheme_GP" } );
 	}

@@ -257,6 +257,16 @@ ACardActor* ASchemePlayerController::GetCardFromHand(const ECardRole RoleToGet) 
 	return nullptr;
 }
 
+void ASchemePlayerController::Client_OnTurnComesToPlayer_Implementation()
+{
+	OnTurnStart();
+}
+
+void ASchemePlayerController::Client_OnTurnEndsForPlayer_Implementation()
+{
+	OnTurnEnd();
+}
+
 void ASchemePlayerController::PrintHoldingCards() const
 {
 	for (const ACardActor* HeldCard : HoldingCards)

@@ -26,6 +26,11 @@ public:
 	// Do not call this function other than server
 	bool RemoveGold(int32 amount);
 	
+	UFUNCTION(BlueprintCallable, Category = "Gold")
+	FORCEINLINE int32 GetGold() const { return Gold; }
+	
+	UFUNCTION(BlueprintCallable, Category = "Game Rules")
+	FORCEINLINE bool ShouldForceAct() { return Gold > 10; }
 	
 	UFUNCTION(BlueprintImplementableEvent, Category = "Gold")
 	void OnGoldChange(int32 NewGold, int32 Delta);
@@ -42,8 +47,8 @@ protected:
 	bool bIsEliminated = false;
 	
 	
-	UPROPERTY(ReplicatedUsing = OnRep_Gold, VisibleAnywhere, Category = "Gold")
-	int32 Gold = 0;
+	UPROPERTY(ReplicatedUsing = OnRep_Gold, EditAnywhere, Category = "Gold")
+	int32 Gold = 2;
 
 	int32 CachedDelta = 0;
 	
@@ -64,13 +69,11 @@ public:
 	FORCEINLINE void SetPlayerIndex(int32 NewIndex) { PlayerIndex = NewIndex; }
 	FORCEINLINE int32 GetPlayerIndex() const { return PlayerIndex; }
 	
+	UFUNCTION(BlueprintCallable)
 	FORCEINLINE bool IsEliminated() const { return bIsEliminated; }
 	FORCEINLINE void SetIsEliminated(bool bEliminated) { bIsEliminated = bEliminated; }
 	
 	FORCEINLINE void SetUsername(const FText& NewUsername) { Username = NewUsername; }
 	FORCEINLINE FText GetUsername() const { return Username; }
-	
-	UFUNCTION(BlueprintPure, Category = "Gold")
-	FORCEINLINE int32 GetGold() const { return Gold; }
 	
 };
