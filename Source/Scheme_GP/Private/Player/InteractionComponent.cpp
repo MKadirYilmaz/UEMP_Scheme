@@ -35,9 +35,11 @@ void UInteractionComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 		return;
 	
 	FHitResult HitResult;
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(OwnerPawn);
 	FVector Start = LineTraceStartComp->GetComponentLocation();
 	FVector End = Start + LineTraceStartComp->GetForwardVector() * MaxInteractionDistance;
-	if (GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, LineTraceChannel))
+	if (GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, LineTraceChannel, Params))
 	{
 		if (bDrawLineTraceLine) DrawDebugLine(GetWorld(), Start, HitResult.ImpactPoint, FColor::Red, false, 0.f, 0, 0.5f);
 
